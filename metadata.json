@@ -1,0 +1,6 @@
+{
+  "name": "Dyko Audiobooks",
+  "description": "Aplicativo PWA pessoal offline para organizar e reproduzir audiolivros locais em formato MP3.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
