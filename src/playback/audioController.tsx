@@ -55,6 +55,7 @@ export const AudioControllerProvider: React.FC<AudioControllerProviderProps> = (
 }) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
+  const fallbackBlobRef = useRef<Blob | null>(null);
   const activeBookRef = useRef<AudiobookRecord | null>(null);
   const onBookUpdatedRef = useRef(onBookUpdated);
   const lastSavedAtRef = useRef<number>(0);
@@ -335,6 +336,7 @@ export const AudioControllerProvider: React.FC<AudioControllerProviderProps> = (
 
       // Pause and release previous Object URL
       el.pause();
+      fallbackBlobRef.current = null;
       if (objectUrlRef.current) {
         URL.revokeObjectURL(objectUrlRef.current);
         objectUrlRef.current = null;
@@ -354,7 +356,16 @@ export const AudioControllerProvider: React.FC<AudioControllerProviderProps> = (
           return;
         }
 
-        const nextUrl = URL.createObjectURL(fileBlob);
+        // For MP4 files, create a zero-copy audio/mp4 Blob view so HTMLAudioElement
+        // decodes strictly the audio track and keeps background/lock-screen playback active on Android.
+        const isMp4 =
+          book.originalName.toLowerCase().endsWith('.mp4') ||
+          book.mimeType.toLowerCase().includes('mp4') ||
+          fileBlob.type.toLowerCase().includes('mp4');
+        const playbackBlob = isMp4 ? fileBlob.slice(0, fileBlob.size, 'audio/mp4') : fileBlob;
+        fallbackBlobRef.current = isMp4 ? fileBlob : null;
+
+        const nextUrl = URL.createObjectURL(playbackBlob);
         objectUrlRef.current = nextUrl;
 
         const targetRate = (book.playbackRate || 1.0) as PlaybackRate;
@@ -419,6 +430,7 @@ export const AudioControllerProvider: React.FC<AudioControllerProviderProps> = (
         el.removeAttribute('src');
         el.load();
       }
+      fallbackBlobRef.current = null;
       if (objectUrlRef.current) {
         URL.revokeObjectURL(objectUrlRef.current);
         objectUrlRef.current = null;
@@ -541,9 +553,29 @@ export const AudioControllerProvider: React.FC<AudioControllerProviderProps> = (
     };
 
     const handleAudioError = () => {
+      const mediaErr = el.error;
+
+      // If an MP4 container failed under forced audio/mp4 MIME type, retry once with the original Blob
+      if (
+        fallbackBlobRef.current &&
+        mediaErr &&
+        (mediaErr.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED ||
+          mediaErr.code === MediaError.MEDIA_ERR_DECODE)
+      ) {
+        const rawFallback = fallbackBlobRef.current;
+        fallbackBlobRef.current = null;
+        if (objectUrlRef.current) {
+          URL.revokeObjectURL(objectUrlRef.current);
+        }
+        const retryUrl = URL.createObjectURL(rawFallback);
+        objectUrlRef.current = retryUrl;
+        el.src = retryUrl;
+        el.load();
+        return;
+      }
+
       setIsLoading(false);
       setIsPlaying(false);
-      const mediaErr = el.error;
       if (mediaErr) {
         if (mediaErr.code === MediaError.MEDIA_ERR_DECODE || mediaErr.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED) {
           setError('Formato de áudio incompatível ou arquivo corrompido.');

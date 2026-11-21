@@ -121,7 +121,7 @@ export const ImportView: React.FC<ImportViewProps> = ({
       setErrorMessage(
         err instanceof Error
           ? err.message
-          : 'Não foi possível acessar a pasta. Use a opção de selecionar arquivos MP3.'
+          : 'Não foi possível acessar a pasta. Use a opção de selecionar arquivos MP3 ou MP4.'
       );
     }
   };
@@ -132,7 +132,7 @@ export const ImportView: React.FC<ImportViewProps> = ({
         ref={fileInputRef}
         type="file"
         multiple
-        accept="audio/mpeg,.mp3,audio/*"
+        accept="audio/mpeg,.mp3,video/mp4,audio/mp4,.mp4,audio/*"
         onChange={handleFileInputChange}
         className="hidden"
         aria-hidden="true"
@@ -143,7 +143,7 @@ export const ImportView: React.FC<ImportViewProps> = ({
           <div>
             <h2 className="text-lg font-semibold text-[#F0F0F0]">Importar audiolivros</h2>
             <p className="text-xs text-[#A0A0A0] mt-0.5">
-              Os arquivos MP3 serão copiados localmente para reprodução offline.
+              Os arquivos MP3 e MP4 serão copiados localmente para reprodução offline em áudio.
             </p>
           </div>
           {onClose && !isImporting && (
@@ -166,8 +166,8 @@ export const ImportView: React.FC<ImportViewProps> = ({
             Dyko Audiobooks
           </h1>
           <p className="mt-3 text-sm sm:text-base text-[#A0A0A0] leading-relaxed max-w-md mx-auto">
-            Importe seus audiolivros em MP3 para ouvir offline, organizar sua biblioteca pessoal e
-            retomar exatamente de onde parou.
+            Importe seus audiolivros em MP3 ou MP4 para ouvir offline, organizar sua biblioteca
+            pessoal e retomar exatamente de onde parou.
           </p>
         </div>
       )}
@@ -301,8 +301,8 @@ export const ImportView: React.FC<ImportViewProps> = ({
           {result.unsupportedCount > 0 && (
             <p className="text-xs text-[#A0A0A0]">
               {result.unsupportedCount === 1
-                ? '1 arquivo ignorado por não ser formato MP3 suportado.'
-                : `${result.unsupportedCount} arquivos ignorados por não serem formato MP3 suportado.`}
+                ? '1 arquivo ignorado por não ser formato MP3 ou MP4 suportado.'
+                : `${result.unsupportedCount} arquivos ignorados por não serem formato MP3 ou MP4 suportado.`}
             </p>
           )}
 

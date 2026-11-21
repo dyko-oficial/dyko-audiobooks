@@ -296,7 +296,7 @@ const AppShell: React.FC<AppShellProps> = ({
         title="Remover audiolivro"
         description={
           deletingBook
-            ? `A cópia local de "${deletingBook.customName}" e seu progresso salvo serão removidos do aplicativo. O arquivo MP3 original do seu dispositivo não será excluído.`
+            ? `A cópia local de "${deletingBook.customName}" e seu progresso salvo serão removidos do aplicativo. O arquivo original do seu dispositivo não será excluído.`
             : ''
         }
         confirmLabel="Remover"

@@ -21,7 +21,7 @@ export default defineConfig(() => {
           id: basePath,
           name: 'Dyko Audiobooks',
           short_name: 'Dyko Audio',
-          description: 'Aplicativo PWA pessoal offline para organizar e reproduzir audiolivros locais em formato MP3.',
+          description: 'Aplicativo PWA pessoal offline para organizar e reproduzir audiolivros locais em formato MP3 e MP4.',
           theme_color: '#121212',
           background_color: '#121212',
           display: 'standalone',

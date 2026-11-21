@@ -102,7 +102,12 @@ export async function saveAudioFile(
   const useOpfs = await isOpfsWritableSupported();
 
   if (useOpfs) {
-    const ext = file.name.toLowerCase().endsWith('.mp3') ? '.mp3' : '.audio';
+    const lowerName = file.name.toLowerCase();
+    const ext = lowerName.endsWith('.mp3')
+      ? '.mp3'
+      : lowerName.endsWith('.mp4')
+        ? '.mp4'
+        : '.audio';
     const storageKey = `${id}${ext}`;
     const dir = await getOpfsAudiobooksDir();
     const fileHandle = await dir.getFileHandle(storageKey, { create: true });

@@ -7,8 +7,16 @@ interface DirectoryPickerWindow extends Window {
   showDirectoryPicker?: (options?: { mode?: 'read' | 'readwrite' }) => Promise<FileSystemDirectoryHandle>;
 }
 
-const SUPPORTED_EXTENSIONS = ['.mp3'];
-const SUPPORTED_MIME_TYPES = new Set(['audio/mpeg', 'audio/mp3', 'audio/x-mpeg', 'audio/x-mp3']);
+const SUPPORTED_EXTENSIONS = ['.mp3', '.mp4'];
+const SUPPORTED_MIME_TYPES = new Set([
+  'audio/mpeg',
+  'audio/mp3',
+  'audio/x-mpeg',
+  'audio/x-mp3',
+  'video/mp4',
+  'audio/mp4',
+  'application/mp4',
+]);
 
 export function isDirectoryPickerSupported(): boolean {
   return typeof window !== 'undefined' && typeof (window as DirectoryPickerWindow).showDirectoryPicker === 'function';
@@ -25,6 +33,12 @@ export function isSupportedAudioFile(file: File): boolean {
   return false;
 }
 
+export function isMp4File(fileName: string, mimeType?: string): boolean {
+  const lowerName = fileName.toLowerCase();
+  const lowerMime = (mimeType || '').toLowerCase();
+  return lowerName.endsWith('.mp4') || lowerMime.includes('mp4');
+}
+
 export function computeFileFingerprint(file: File): string {
   return `${file.name.toLowerCase().trim()}::${file.size}::${file.lastModified}`;
 }
@@ -37,43 +51,51 @@ function generateId(): string {
 }
 
 /**
- * Extracts duration from audio metadata without decoding the entire multi-hour file.
+ * Extracts duration from audio/MP4 metadata without decoding the entire multi-hour file.
  */
 export function extractAudioDuration(file: File | Blob): Promise<number> {
-  return new Promise((resolve) => {
-    const audio = document.createElement('audio');
-    const url = URL.createObjectURL(file);
-    let settled = false;
+  const probeDuration = (sourceBlob: Blob): Promise<number> =>
+    new Promise((resolve) => {
+      const audio = document.createElement('audio');
+      const url = URL.createObjectURL(sourceBlob);
+      let settled = false;
 
-    const cleanup = (duration: number) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      audio.removeAttribute('src');
-      audio.load();
-      URL.revokeObjectURL(url);
-      resolve(Number.isFinite(duration) && duration > 0 ? duration : 0);
-    };
+      const cleanup = (duration: number) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        audio.removeAttribute('src');
+        audio.load();
+        URL.revokeObjectURL(url);
+        resolve(Number.isFinite(duration) && duration > 0 ? duration : 0);
+      };
 
-    const timer = window.setTimeout(() => cleanup(0), 12000);
+      const timer = window.setTimeout(() => cleanup(0), 12000);
 
-    audio.preload = 'metadata';
-    audio.onloadedmetadata = () => {
-      if (audio.duration === Infinity) {
-        // Fallback for certain VBR MP3 files without Xing/VBRI header
-        audio.currentTime = 1e7;
-        audio.ontimeupdate = () => {
-          audio.ontimeupdate = null;
-          const computed = Number.isFinite(audio.duration) ? audio.duration : 0;
-          cleanup(computed);
-        };
-      } else {
-        cleanup(audio.duration);
-      }
-    };
-    audio.onerror = () => cleanup(0);
-    audio.src = url;
-  });
+      audio.preload = 'metadata';
+      audio.onloadedmetadata = () => {
+        if (audio.duration === Infinity) {
+          audio.currentTime = 1e7;
+          audio.ontimeupdate = () => {
+            audio.ontimeupdate = null;
+            const computed = Number.isFinite(audio.duration) ? audio.duration : 0;
+            cleanup(computed);
+          };
+        } else {
+          cleanup(audio.duration);
+        }
+      };
+      audio.onerror = () => cleanup(0);
+      audio.src = url;
+    });
+
+  const fileName = file instanceof File ? file.name : '';
+  if (isMp4File(fileName, file.type)) {
+    const audioTypedSlice = file.slice(0, file.size, 'audio/mp4');
+    return probeDuration(audioTypedSlice).then((dur) => (dur > 0 ? dur : probeDuration(file)));
+  }
+
+  return probeDuration(file);
 }
 
 async function collectFilesFromDirectory(
@@ -265,7 +287,7 @@ export async function importAudioFiles(
         storageType,
         storageKey,
         fileSize: file.size,
-        mimeType: file.type || 'audio/mpeg',
+        mimeType: file.type || (isMp4File(file.name, file.type) ? 'audio/mp4' : 'audio/mpeg'),
         lastModified: file.lastModified || Date.now(),
         duration,
         importedAt: Date.now() + i, // Preserve deterministic ordering within batch
