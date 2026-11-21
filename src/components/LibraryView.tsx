@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  AudioLines,
   ArrowUpDown,
   BookOpen,
   Check,
   Headphones,
+  Loader2,
   MoreVertical,
   Pencil,
   Plus,
@@ -12,6 +14,7 @@ import {
 } from 'lucide-react';
 import type { AudiobookRecord, FilterOption, SortOption } from '../types/audiobook';
 import { useAudioController } from '../playback/audioController';
+import { needsMp4Optimization } from '../import/importManager';
 import {
   calculateProgressPercent,
   formatDurationHuman,
@@ -19,6 +22,13 @@ import {
   getStatusLabel,
 } from '../utils/format';
 import { PWAInstallButton } from './PWAInstallButton';
+
+export interface OptimizationProgressState {
+  currentIndex: number;
+  total: number;
+  currentTitle: string;
+  percent: number;
+}
 
 interface LibraryViewProps {
   books: AudiobookRecord[];
@@ -29,6 +39,8 @@ interface LibraryViewProps {
   onRestartBook: (book: AudiobookRecord) => void;
   onRequestDeleteBook: (book: AudiobookRecord) => void;
   onRequestDeleteAll: () => void;
+  onOptimizeBooks: (targets: AudiobookRecord[]) => void;
+  optimizationProgress: OptimizationProgressState | null;
 }
 
 const FILTER_TABS: Array<{ value: FilterOption; label: string }> = [
@@ -53,12 +65,15 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   onRestartBook,
   onRequestDeleteBook,
   onRequestDeleteAll,
+  onOptimizeBooks,
+  optimizationProgress,
 }) => {
   const { activeBook, isPlaying } = useAudioController();
   const [filter, setFilter] = useState<FilterOption>('all');
   const [sortBy, setSortBy] = useState<SortOption>('lastPlayedAt');
   const [openMenuBookId, setOpenMenuBookId] = useState<string | null>(null);
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
+  const isOptimizing = Boolean(optimizationProgress);
 
   const menuContainerRef = useRef<HTMLDivElement | null>(null);
 
@@ -100,6 +115,11 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
       completed,
     };
   }, [books]);
+
+  const unoptimizedMp4Books = useMemo(
+    () => books.filter((b) => needsMp4Optimization(b)),
+    [books]
+  );
 
   const filteredAndSortedBooks = useMemo(() => {
     const filtered = filter === 'all' ? books : books.filter((b) => b.status === filter);
@@ -237,6 +257,49 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
             </select>
           </div>
         </div>
+
+        {/* Pending MP4 Background Optimization Banner */}
+        {(unoptimizedMp4Books.length > 0 || optimizationProgress) && (
+          <div className="mb-4 rounded-2xl bg-[#1C1C1C] border border-[#2E2E2E] p-4">
+            {optimizationProgress ? (
+              <div className="space-y-2.5" role="status" aria-live="polite">
+                <div className="flex items-center justify-between gap-3 text-xs sm:text-sm">
+                  <span className="flex items-center gap-2 font-medium text-[#F0F0F0] min-w-0">
+                    <Loader2 className="w-4 h-4 text-[#B5A58A] animate-spin shrink-0" aria-hidden="true" />
+                    <span className="truncate">
+                      Otimizando {optimizationProgress.currentIndex} de {optimizationProgress.total}:{' '}
+                      {optimizationProgress.currentTitle}
+                    </span>
+                  </span>
+                  <span className="font-mono text-xs text-[#B5A58A] tabular-nums shrink-0">
+                    {optimizationProgress.percent}%
+                  </span>
+                </div>
+                <div className="w-full h-1.5 rounded-full bg-[#2E2E2E] overflow-hidden">
+                  <div
+                    className="h-full bg-[#B5A58A] transition-all duration-150"
+                    style={{ width: `${Math.max(4, optimizationProgress.percent)}%` }}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <p className="text-xs sm:text-sm text-[#A0A0A0] leading-relaxed">
+                  {unoptimizedMp4Books.length === 1
+                    ? '1 audiolivro MP4 já importado pode ser otimizado (sem vídeo) para tocar em segundo plano sem pausar, mantendo seu progresso.'
+                    : `${unoptimizedMp4Books.length} audiolivros MP4 já importados podem ser otimizados (sem vídeo) para tocar em segundo plano sem pausar, mantendo seu progresso.`}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => onOptimizeBooks(unoptimizedMp4Books)}
+                  className="min-h-[44px] px-4 rounded-xl bg-[#242424] border border-[#B5A58A]/40 text-xs sm:text-sm font-medium text-[#F0F0F0] hover:bg-[#2C2C2C] active:scale-[0.98] transition whitespace-nowrap shrink-0"
+                >
+                  Otimizar para segundo plano
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Vertical List of Audiobooks */}
         {filteredAndSortedBooks.length === 0 ? (
@@ -435,16 +498,33 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                             </button>
                           )}
 
+                          {needsMp4Optimization(book) && (
+                            <button
+                              type="button"
+                              role="menuitem"
+                              disabled={isOptimizing}
+                              onClick={() => {
+                                setOpenMenuBookId(null);
+                                onOptimizeBooks([book]);
+                              }}
+                              className="w-full min-h-[44px] px-4 flex items-center gap-3 text-left text-sm text-[#B5A58A] hover:bg-[#2C2C2C] disabled:opacity-50 transition"
+                            >
+                              <AudioLines className="w-4 h-4 shrink-0" aria-hidden="true" />
+                              <span>Otimizar para segundo plano</span>
+                            </button>
+                          )}
+
                           <div className="my-1 border-t border-[#2E2E2E]" />
 
                           <button
                             type="button"
                             role="menuitem"
+                            disabled={isOptimizing}
                             onClick={() => {
                               setOpenMenuBookId(null);
                               onRequestDeleteBook(book);
                             }}
-                            className="w-full min-h-[44px] px-4 flex items-center gap-3 text-left text-sm text-[#CF6679] hover:bg-[#2C2C2C] transition"
+                            className="w-full min-h-[44px] px-4 flex items-center gap-3 text-left text-sm text-[#CF6679] hover:bg-[#2C2C2C] disabled:opacity-50 transition"
                           >
                             <Trash2 className="w-4 h-4 shrink-0" aria-hidden="true" />
                             <span>Remover</span>

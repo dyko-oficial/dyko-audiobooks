@@ -356,14 +356,26 @@ export const AudioControllerProvider: React.FC<AudioControllerProviderProps> = (
           return;
         }
 
-        // For MP4 files, create a zero-copy audio/mp4 Blob view so HTMLAudioElement
-        // decodes strictly the audio track and keeps background/lock-screen playback active on Android.
-        const isMp4 =
-          book.originalName.toLowerCase().endsWith('.mp4') ||
-          book.mimeType.toLowerCase().includes('mp4') ||
-          fileBlob.type.toLowerCase().includes('mp4');
-        const playbackBlob = isMp4 ? fileBlob.slice(0, fileBlob.size, 'audio/mp4') : fileBlob;
-        fallbackBlobRef.current = isMp4 ? fileBlob : null;
+        // Optimized MP4s (.m4a) already contain strictly audio tracks (has_video === false).
+        // For unoptimized legacy/fallback MP4s, keep the zero-copy audio/mp4 slice + raw fallback.
+        const isOptimizedAudioMp4 =
+          book.audioOptimized === true &&
+          (book.storageKey.toLowerCase().endsWith('.m4a') ||
+            book.mimeType.toLowerCase() === 'audio/mp4');
+        const isLegacyMp4 =
+          !isOptimizedAudioMp4 &&
+          (book.originalName.toLowerCase().endsWith('.mp4') ||
+            book.mimeType.toLowerCase().includes('mp4') ||
+            fileBlob.type.toLowerCase().includes('mp4'));
+
+        const playbackBlob = isOptimizedAudioMp4
+          ? fileBlob.type === 'audio/mp4'
+            ? fileBlob
+            : fileBlob.slice(0, fileBlob.size, 'audio/mp4')
+          : isLegacyMp4
+            ? fileBlob.slice(0, fileBlob.size, 'audio/mp4')
+            : fileBlob;
+        fallbackBlobRef.current = isLegacyMp4 ? fileBlob : null;
 
         const nextUrl = URL.createObjectURL(playbackBlob);
         objectUrlRef.current = nextUrl;

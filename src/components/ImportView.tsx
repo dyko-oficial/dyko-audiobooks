@@ -132,7 +132,7 @@ export const ImportView: React.FC<ImportViewProps> = ({
         ref={fileInputRef}
         type="file"
         multiple
-        accept="audio/mpeg,.mp3,video/mp4,audio/mp4,.mp4,audio/*"
+        accept="audio/mpeg,.mp3,video/mp4,audio/mp4,.mp4,.m4a,audio/*"
         onChange={handleFileInputChange}
         className="hidden"
         aria-hidden="true"
@@ -228,7 +228,9 @@ export const ImportView: React.FC<ImportViewProps> = ({
                 ? 'Lendo pasta...'
                 : progress.phase === 'checking'
                   ? 'Verificando arquivos...'
-                  : `Copiando ${progress.processedFiles + 1} de ${progress.totalFiles}`}
+                  : progress.phase === 'remuxing'
+                    ? `Extraindo áudio ${progress.processedFiles + 1} de ${progress.totalFiles}`
+                    : `Copiando ${progress.processedFiles + 1} de ${progress.totalFiles}`}
             </span>
             <span className="font-mono text-xs text-[#B5A58A] tabular-nums shrink-0">
               {progress.overallPercent}%
@@ -304,6 +306,30 @@ export const ImportView: React.FC<ImportViewProps> = ({
                 ? '1 arquivo ignorado por não ser formato MP3 ou MP4 suportado.'
                 : `${result.unsupportedCount} arquivos ignorados por não serem formato MP3 ou MP4 suportado.`}
             </p>
+          )}
+
+          {result.optimizedCount > 0 && (
+            <p className="text-xs text-[#A0A0A0]">
+              {result.optimizedCount === 1
+                ? '1 arquivo MP4 teve a faixa de áudio isolada (sem vídeo) para reprodução contínua em segundo plano.'
+                : `${result.optimizedCount} arquivos MP4 tiveram a faixa de áudio isolada (sem vídeo) para reprodução contínua em segundo plano.`}
+            </p>
+          )}
+
+          {result.warnings.length > 0 && (
+            <div className="space-y-2 pt-1">
+              {result.warnings.map((warn) => (
+                <div
+                  key={warn.fileName}
+                  className="rounded-xl bg-[#242424] border border-[#B5A58A]/35 p-3 flex items-start gap-2.5 text-xs text-[#F0F0F0]"
+                >
+                  <AlertCircle className="w-4 h-4 text-[#B5A58A] shrink-0 mt-0.5" aria-hidden="true" />
+                  <p className="leading-relaxed">
+                    <span className="font-medium">{warn.fileName}:</span> {warn.message}
+                  </p>
+                </div>
+              ))}
+            </div>
           )}
 
           {result.failed.length > 0 && (

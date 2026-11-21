@@ -5,14 +5,17 @@ import {
   clearAllAudiobookRecords,
   deleteAudiobookRecord,
   getAllAudiobooks,
+  getAudiobookById,
   reconcilePendingCheckpoint,
   updateAudiobookFields,
 } from './storage/db';
 import { clearAllAudioFiles, deleteAudioFile } from './storage/fileStorage';
+import { optimizeExistingAudiobook } from './import/importManager';
+import { formatFileSize } from './utils/format';
 import { AudioControllerProvider, useAudioController } from './playback/audioController';
 import { OfflineBanner } from './components/OfflineBanner';
 import { ImportView } from './components/ImportView';
-import { LibraryView } from './components/LibraryView';
+import { LibraryView, type OptimizationProgressState } from './components/LibraryView';
 import { MiniPlayer } from './components/MiniPlayer';
 import { PlayerView } from './components/PlayerView';
 import { ConfirmDialog, RenameDialog } from './components/Dialogs';
@@ -43,6 +46,7 @@ const AppShell: React.FC<AppShellProps> = ({
   const {
     activeBook,
     openAudiobook,
+    saveCurrentPosition,
     syncActiveBookMeta,
     stopAndClearIfActive,
   } = useAudioController();
@@ -55,6 +59,8 @@ const AppShell: React.FC<AppShellProps> = ({
   const [isDeleting, setIsDeleting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [importNotice, setImportNotice] = useState<string | null>(null);
+  const [optimizationProgress, setOptimizationProgress] =
+    useState<OptimizationProgressState | null>(null);
 
   const handleSelectBook = (book: AudiobookRecord) => {
     setActionError(null);
@@ -150,6 +156,74 @@ const AppShell: React.FC<AppShellProps> = ({
     }
   };
 
+  const handleOptimizeBooks = async (targets: AudiobookRecord[]) => {
+    if (targets.length === 0 || optimizationProgress) return;
+
+    setActionError(null);
+    setImportNotice(null);
+
+    let optimizedSuccess = 0;
+    let totalSavedBytes = 0;
+    const failedMessages: string[] = [];
+
+    for (let i = 0; i < targets.length; i++) {
+      let target = targets[i];
+
+      // If this audiobook is currently loaded in the audio element, save its exact timestamp
+      // and release its file handle before replacing the underlying OPFS/IDB file.
+      if (activeBook?.id === target.id) {
+        await saveCurrentPosition();
+        const latest = await getAudiobookById(target.id);
+        if (latest) target = latest;
+        stopAndClearIfActive(target.id);
+      }
+
+      setOptimizationProgress({
+        currentIndex: i + 1,
+        total: targets.length,
+        currentTitle: target.customName,
+        percent: 0,
+      });
+
+      try {
+        const res = await optimizeExistingAudiobook(target, (percent) => {
+          setOptimizationProgress({
+            currentIndex: i + 1,
+            total: targets.length,
+            currentTitle: target.customName,
+            percent,
+          });
+        });
+
+        onBookReplaced(res.updated);
+        optimizedSuccess += 1;
+        totalSavedBytes += res.savedBytes;
+      } catch (err) {
+        const reason =
+          err instanceof Error ? err.message : 'Estrutura MP4 incompatível com a otimização.';
+        failedMessages.push(`${target.customName}: ${reason}`);
+      }
+    }
+
+    setOptimizationProgress(null);
+
+    if (optimizedSuccess > 0) {
+      const savedText =
+        totalSavedBytes > 1024 * 1024 ? ` (${formatFileSize(totalSavedBytes)} liberados)` : '';
+      setImportNotice(
+        optimizedSuccess === 1
+          ? `1 audiolivro MP4 otimizado para segundo plano com seu progresso mantido${savedText}.`
+          : `${optimizedSuccess} audiolivros MP4 otimizados para segundo plano com o progresso mantido${savedText}.`
+      );
+    }
+
+    if (failedMessages.length > 0) {
+      setActionError(
+        `Não foi possível otimizar ${failedMessages.length === 1 ? '1 arquivo' : `${failedMessages.length} arquivos`} (a cópia original e o progresso foram mantidos): ${failedMessages.join(' · ')}`
+      );
+    }
+  };
+
   if (isLoadingBooks) {
     return (
       <div className="min-h-[100dvh] flex flex-col items-center justify-center gap-3 bg-[#121212] px-6">
@@ -198,11 +272,23 @@ const AppShell: React.FC<AppShellProps> = ({
                 ? '1 audiolivro importado com sucesso.'
                 : `${imported.length} audiolivros importados com sucesso.`,
             ];
+            if (summary.optimizedCount > 0) {
+              parts.push(
+                summary.optimizedCount === 1
+                  ? '1 MP4 otimizado sem vídeo para segundo plano.'
+                  : `${summary.optimizedCount} MP4s otimizados sem vídeo para segundo plano.`
+              );
+            }
             if (summary.unsupportedCount > 0) {
               parts.push(`${summary.unsupportedCount} arquivo(s) não suportado(s) ignorado(s).`);
             }
             if (summary.duplicates.length > 0) {
               parts.push(`${summary.duplicates.length} duplicado(s) ignorado(s).`);
+            }
+            if (summary.warnings.length > 0) {
+              setActionError(
+                summary.warnings.map((w) => `${w.fileName}: ${w.message}`).join(' · ')
+              );
             }
             setImportNotice(parts.join(' '));
           }}
@@ -269,6 +355,8 @@ const AppShell: React.FC<AppShellProps> = ({
             onRestartBook={(book) => void handleRestartBook(book)}
             onRequestDeleteBook={(book) => setDeletingBook(book)}
             onRequestDeleteAll={() => setConfirmDeleteAll(true)}
+            onOptimizeBooks={(targets) => void handleOptimizeBooks(targets)}
+            optimizationProgress={optimizationProgress}
           />
           <MiniPlayer onOpenPlayer={() => setScreen('player')} />
         </>

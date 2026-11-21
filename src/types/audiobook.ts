@@ -25,6 +25,11 @@ export interface AudiobookRecord {
   currentTime: number;
   playbackRate: PlaybackRate;
   status: AudiobookStatus;
+  /**
+   * True for native MP3 files and MP4 files whose video track was stripped (or never existed).
+   * False/undefined for legacy or fallback full MP4 files containing a video track.
+   */
+  audioOptimized?: boolean;
 }
 
 export interface PlaybackCheckpoint {
@@ -45,7 +50,7 @@ export interface StorageEstimateInfo {
 }
 
 export interface ImportProgress {
-  phase: 'scanning' | 'checking' | 'importing' | 'done';
+  phase: 'scanning' | 'checking' | 'remuxing' | 'importing' | 'done';
   totalFiles: number;
   processedFiles: number;
   currentFileName: string;
@@ -53,10 +58,17 @@ export interface ImportProgress {
   overallPercent: number;
 }
 
+export interface ImportWarning {
+  fileName: string;
+  message: string;
+}
+
 export interface ImportResult {
   imported: AudiobookRecord[];
   duplicates: string[];
   unsupportedCount: number;
+  optimizedCount: number;
+  warnings: ImportWarning[];
   failed: Array<{ fileName: string; reason: string }>;
   insufficientStorage?: {
     requiredBytes: number;

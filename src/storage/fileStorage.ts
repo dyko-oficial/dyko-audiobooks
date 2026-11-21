@@ -90,24 +90,30 @@ export async function getStorageEstimate(): Promise<StorageEstimateInfo> {
 }
 
 /**
- * Streams a potentially multi-hour MP3 file into OPFS in small chunks without
+ * Streams a potentially multi-hour audio/MP4 file into OPFS in small chunks without
  * loading the entire file into RAM. Falls back to IndexedDB Blob storage if OPFS
  * writable streams are unavailable.
  */
 export async function saveAudioFile(
   id: string,
-  file: File,
-  onProgress?: (percent: number) => void
+  file: Blob,
+  fileName: string,
+  onProgress?: (percent: number) => void,
+  overrideExt?: string
 ): Promise<{ storageType: AudioStorageType; storageKey: string }> {
   const useOpfs = await isOpfsWritableSupported();
 
   if (useOpfs) {
-    const lowerName = file.name.toLowerCase();
-    const ext = lowerName.endsWith('.mp3')
-      ? '.mp3'
-      : lowerName.endsWith('.mp4')
-        ? '.mp4'
-        : '.audio';
+    const lowerName = fileName.toLowerCase();
+    const ext =
+      overrideExt ??
+      (lowerName.endsWith('.mp3')
+        ? '.mp3'
+        : lowerName.endsWith('.m4a')
+          ? '.m4a'
+          : lowerName.endsWith('.mp4')
+            ? '.mp4'
+            : '.audio');
     const storageKey = `${id}${ext}`;
     const dir = await getOpfsAudiobooksDir();
     const fileHandle = await dir.getFileHandle(storageKey, { create: true });
@@ -131,8 +137,7 @@ export async function saveAudioFile(
           }
         }
       } else {
-        // Chunked slice fallback when File.stream() is unavailable
-        const CHUNK_SIZE = 4 * 1024 * 1024; // 4 MB chunks
+        const CHUNK_SIZE = 4 * 1024 * 1024;
         let offset = 0;
         while (offset < file.size) {
           const slice = file.slice(offset, offset + CHUNK_SIZE);
@@ -154,11 +159,79 @@ export async function saveAudioFile(
     }
   }
 
-  // Fallback: IndexedDB stores Blob references directly on disk without reading full bytes into JS heap
   onProgress?.(15);
   await putAudioBlob(id, file);
   onProgress?.(100);
   return { storageType: 'idb', storageKey: id };
+}
+
+/**
+ * Opens a streaming writer directly to OPFS (or collects Blob parts for IndexedDB fallback)
+ * so the lossless MP4 remuxer can write audio-only chunks without buffering the whole file.
+ */
+export async function saveAudioFromWriter<T>(
+  id: string,
+  ext: string,
+  mimeType: string,
+  runWriter: (writeChunk: (chunk: Uint8Array) => Promise<void>) => Promise<T>
+): Promise<{
+  storageType: AudioStorageType;
+  storageKey: string;
+  bytesWritten: number;
+  writerResult: T;
+}> {
+  const useOpfs = await isOpfsWritableSupported();
+
+  if (useOpfs) {
+    const storageKey = `${id}${ext}`;
+    const dir = await getOpfsAudiobooksDir();
+    const fileHandle = await dir.getFileHandle(storageKey, { create: true });
+    const writable = await fileHandle.createWritable();
+    let bytesWritten = 0;
+
+    try {
+      const writerResult = await runWriter(async (chunk) => {
+        if (chunk.byteLength === 0) return;
+        const payload = chunk.slice();
+        await writable.write(payload);
+        bytesWritten += payload.byteLength;
+      });
+      await writable.close();
+      return {
+        storageType: 'opfs',
+        storageKey,
+        bytesWritten,
+        writerResult,
+      };
+    } catch (err) {
+      await writable.abort().catch(() => {});
+      await dir.removeEntry(storageKey).catch(() => {});
+      throw err;
+    }
+  }
+
+  // Fallback for browsers without OPFS createWritable: assemble Blob in IndexedDB
+  const parts: BlobPart[] = [];
+  let bytesWritten = 0;
+  const writerResult = await runWriter(async (chunk) => {
+    if (chunk.byteLength === 0) return;
+    const copy = new Uint8Array(chunk.byteLength);
+    copy.set(chunk);
+    parts.push(copy.buffer);
+    bytesWritten += chunk.byteLength;
+  });
+
+  if (bytesWritten > 0) {
+    const blob = new Blob(parts, { type: mimeType });
+    await putAudioBlob(id, blob);
+  }
+
+  return {
+    storageType: 'idb',
+    storageKey: id,
+    bytesWritten,
+    writerResult,
+  };
 }
 
 /**
