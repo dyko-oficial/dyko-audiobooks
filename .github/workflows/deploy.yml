@@ -27,17 +27,11 @@ jobs:
           node-version: 22
 
       - name: Install dependencies
-        run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            npm install
-          fi
+        run: npm install --legacy-peer-deps
 
       - name: Build PWA for GitHub Pages
-        env:
-          REPO_NAME: ${{ github.event.repository.name }}
         run: |
+          REPO_NAME="${GITHUB_REPOSITORY#*/}"
           if [[ "$REPO_NAME" == *.github.io ]]; then
             export VITE_BASE_PATH="/"
           else
