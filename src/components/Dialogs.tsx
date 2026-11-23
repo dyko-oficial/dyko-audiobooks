@@ -41,20 +41,21 @@ export const RenameDialog: React.FC<RenameDialogProps> = ({ book, onCancel, onCo
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/75 p-0 sm:p-4"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-[#090C10]/80 backdrop-blur-xs p-0 sm:p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="rename-dialog-title"
     >
-      <div className="w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl bg-[#1C1C1C] border-t sm:border border-[#2E2E2E] p-6 pb-safe">
-        <div className="flex items-center justify-between gap-4 mb-4">
-          <h2 id="rename-dialog-title" className="text-base font-semibold text-[#F0F0F0]">
+      <div className="w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl bg-[#182028] border-t sm:border border-[#2A3642] p-6 pb-safe">
+        <div className="w-10 h-1 rounded-full bg-[#2A3642] mx-auto mb-4 sm:hidden" aria-hidden="true" />
+        <div className="flex items-center justify-between gap-4 mb-5">
+          <h2 id="rename-dialog-title" className="font-display text-lg font-medium text-[#EDE9E0]">
             Renomear audiolivro
           </h2>
           <button
             type="button"
             onClick={onCancel}
-            className="min-h-[44px] min-w-[44px] -mr-2 flex items-center justify-center rounded-xl text-[#A0A0A0] hover:text-[#F0F0F0]"
+            className="min-h-[44px] min-w-[44px] -mr-2 flex items-center justify-center rounded-xl text-[#96A2AE] hover:text-[#EDE9E0] hover:bg-[#212B36] transition-colors"
             aria-label="Fechar"
           >
             <X className="w-5 h-5" />
@@ -63,8 +64,8 @@ export const RenameDialog: React.FC<RenameDialogProps> = ({ book, onCancel, onCo
 
         <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
           <div>
-            <label htmlFor="audiobook-name-input" className="block text-xs text-[#A0A0A0] mb-1.5">
-              Nome exibido no aplicativo
+            <label htmlFor="audiobook-name-input" className="block text-xs text-[#96A2AE] mb-2">
+              Título na biblioteca
             </label>
             <input
               ref={inputRef}
@@ -73,26 +74,26 @@ export const RenameDialog: React.FC<RenameDialogProps> = ({ book, onCancel, onCo
               value={name}
               onChange={(e) => setName(e.target.value)}
               maxLength={180}
-              className="w-full min-h-[48px] px-3.5 rounded-xl bg-[#121212] border border-[#2E2E2E] text-sm text-[#F0F0F0] placeholder:text-[#A0A0A0]/60 focus:border-[#B5A58A] focus:outline-none"
-              placeholder="Digite o nome do audiolivro"
+              className="w-full min-h-[48px] px-3.5 rounded-xl bg-[#11161C] border border-[#2A3642] text-sm text-[#EDE9E0] placeholder:text-[#96A2AE]/60 focus:border-[#E0A458] focus:outline-none transition-colors"
+              placeholder="Digite o título do audiolivro"
             />
-            <p className="mt-2 text-xs text-[#A0A0A0] truncate">
-              Arquivo original: {book.originalName}
+            <p className="mt-2 text-xs text-[#96A2AE] truncate">
+              Arquivo: {book.originalName}
             </p>
           </div>
 
-          <div className="flex items-center justify-end gap-3 pt-2">
+          <div className="grid grid-cols-2 sm:flex sm:items-center sm:justify-end gap-3 pt-2">
             <button
               type="button"
               onClick={onCancel}
-              className="min-h-[44px] px-4 rounded-xl bg-[#242424] border border-[#2E2E2E] text-sm font-medium text-[#F0F0F0] hover:bg-[#2C2C2C] transition"
+              className="min-h-[44px] px-4 rounded-xl bg-[#212B36] border border-[#2A3642] text-sm font-medium text-[#EDE9E0] hover:bg-[#283442] transition-colors"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={!trimmed || isSaving}
-              className="min-h-[44px] px-5 rounded-xl bg-[#B5A58A] text-[#121212] text-sm font-semibold hover:bg-[#C6B79E] disabled:opacity-50 transition"
+              className="min-h-[44px] px-5 rounded-xl bg-[#E0A458] text-[#11161C] text-sm font-semibold hover:bg-[#ECB56F] disabled:opacity-50 transition-colors"
             >
               {isSaving ? 'Salvando...' : 'Salvar'}
             </button>
@@ -128,23 +129,24 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/75 p-0 sm:p-4"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-[#090C10]/80 backdrop-blur-xs p-0 sm:p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="confirm-dialog-title"
     >
-      <div className="w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl bg-[#1C1C1C] border-t sm:border border-[#2E2E2E] p-6 pb-safe">
-        <h2 id="confirm-dialog-title" className="text-base font-semibold text-[#F0F0F0]">
+      <div className="w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl bg-[#182028] border-t sm:border border-[#2A3642] p-6 pb-safe">
+        <div className="w-10 h-1 rounded-full bg-[#2A3642] mx-auto mb-4 sm:hidden" aria-hidden="true" />
+        <h2 id="confirm-dialog-title" className="font-display text-lg font-medium text-[#EDE9E0]">
           {title}
         </h2>
-        <p className="mt-2.5 text-sm text-[#A0A0A0] leading-relaxed">{description}</p>
+        <p className="mt-2.5 text-sm text-[#96A2AE] leading-relaxed">{description}</p>
 
-        <div className="mt-6 flex items-center justify-end gap-3">
+        <div className="mt-6 grid grid-cols-2 sm:flex sm:items-center sm:justify-end gap-3">
           <button
             type="button"
             disabled={isBusy}
             onClick={onCancel}
-            className="min-h-[44px] px-4 rounded-xl bg-[#242424] border border-[#2E2E2E] text-sm font-medium text-[#F0F0F0] hover:bg-[#2C2C2C] disabled:opacity-50 transition"
+            className="min-h-[44px] px-4 rounded-xl bg-[#212B36] border border-[#2A3642] text-sm font-medium text-[#EDE9E0] hover:bg-[#283442] disabled:opacity-50 transition-colors"
           >
             Cancelar
           </button>
@@ -154,8 +156,8 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             onClick={onConfirm}
             className={
               destructive
-                ? 'min-h-[44px] px-5 rounded-xl bg-[#CF6679] text-[#121212] text-sm font-semibold hover:opacity-90 disabled:opacity-50 transition'
-                : 'min-h-[44px] px-5 rounded-xl bg-[#B5A58A] text-[#121212] text-sm font-semibold hover:bg-[#C6B79E] disabled:opacity-50 transition'
+                ? 'min-h-[44px] px-5 rounded-xl bg-[#E06C75] text-[#11161C] text-sm font-semibold hover:opacity-90 disabled:opacity-50 transition'
+                : 'min-h-[44px] px-5 rounded-xl bg-[#E0A458] text-[#11161C] text-sm font-semibold hover:bg-[#ECB56F] disabled:opacity-50 transition-colors'
             }
           >
             {isBusy ? 'Removendo...' : confirmLabel}

@@ -1,9 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle,
   ArrowLeft,
   Check,
-  Headphones,
   Loader2,
   MoreVertical,
   Pause,
@@ -26,6 +25,32 @@ interface PlayerViewProps {
   onRequestRename: (book: AudiobookRecord) => void;
   onMarkCompleted: (book: AudiobookRecord) => void;
 }
+
+function getBookMonogram(title: string): string {
+  const words = title
+    .trim()
+    .split(/[\s\-–—_.:/]+/)
+    .filter((w) => /[A-Za-zÀ-ÿ0-9]/.test(w));
+  if (words.length === 0) return 'DA';
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return `${words[0][0]}${words[1][0]}`.toUpperCase();
+}
+
+const DIAL_TICKS = Array.from({ length: 60 }, (_, idx) => {
+  const angleDeg = idx * 6 - 90;
+  const rad = (angleDeg * Math.PI) / 180;
+  const isMajor = idx % 5 === 0;
+  const rOuter = 104;
+  const rInner = isMajor ? 95 : 99;
+  return {
+    key: idx,
+    isMajor,
+    x1: 120 + rInner * Math.cos(rad),
+    y1: 120 + rInner * Math.sin(rad),
+    x2: 120 + rOuter * Math.cos(rad),
+    y2: 120 + rOuter * Math.sin(rad),
+  };
+});
 
 export const PlayerView: React.FC<PlayerViewProps> = ({
   onBackToLibrary,
@@ -71,6 +96,11 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
     };
   }, []);
 
+  const monogram = useMemo(
+    () => (activeBook ? getBookMonogram(activeBook.customName) : ''),
+    [activeBook]
+  );
+
   if (!activeBook) {
     return null;
   }
@@ -82,6 +112,12 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
     effectiveDuration > 0
       ? Math.min(100, Math.max(0, (displayTime / effectiveDuration) * 100))
       : 0;
+  const roundedPercent = calculateProgressPercent(displayTime, effectiveDuration, activeBook.status);
+
+  // SVG progress arc math (r = 84)
+  const arcRadius = 84;
+  const arcCircumference = 2 * Math.PI * arcRadius;
+  const arcDashOffset = arcCircumference * (1 - progressPercent / 100);
 
   const handleBack = () => {
     void saveCurrentPosition();
@@ -109,21 +145,21 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
   };
 
   const scrubberTrackStyle: React.CSSProperties = {
-    background: `linear-gradient(to right, #B5A58A 0%, #B5A58A ${progressPercent}%, #2E2E2E ${progressPercent}%, #2E2E2E 100%)`,
+    background: `linear-gradient(to right, #E0A458 0%, #E0A458 ${progressPercent}%, #2A3642 ${progressPercent}%, #2A3642 100%)`,
   };
 
   return (
-    <div className="min-h-[100dvh] flex flex-col bg-[#121212]">
-      {/* Compact Top Bar */}
-      <header className="sticky top-0 z-20 bg-[#121212] border-b border-[#242424] pt-safe">
-        <div className="max-w-2xl mx-auto h-14 px-3 sm:px-6 flex items-center justify-between gap-2">
+    <div className="min-h-[100dvh] flex flex-col bg-[#11161C]">
+      {/* Compact 56px Top Bar */}
+      <header className="sticky top-0 z-20 bg-[#11161C]/95 backdrop-blur-sm border-b border-[#2A3642]/70 pt-safe">
+        <div className="max-w-5xl mx-auto h-14 px-4 sm:px-6 flex items-center justify-between gap-3">
           <button
             type="button"
             onClick={handleBack}
-            className="inline-flex items-center gap-2 min-h-[44px] px-2 -ml-1 rounded-xl text-sm font-medium text-[#F0F0F0] hover:bg-[#1C1C1C] transition whitespace-nowrap shrink-0"
+            className="inline-flex items-center gap-2 min-h-[44px] px-2 -ml-2 rounded-xl text-sm font-medium text-[#EDE9E0] hover:bg-[#182028] transition-colors whitespace-nowrap shrink-0"
             aria-label="Voltar à biblioteca"
           >
-            <ArrowLeft className="w-5 h-5 text-[#B5A58A]" aria-hidden="true" />
+            <ArrowLeft className="w-4 h-4 text-[#E0A458]" aria-hidden="true" />
             <span>Biblioteca</span>
           </button>
 
@@ -131,7 +167,7 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
             <button
               type="button"
               onClick={() => setMenuOpen((prev) => !prev)}
-              className="min-h-[44px] min-w-[44px] -mr-1.5 flex items-center justify-center rounded-xl text-[#A0A0A0] hover:text-[#F0F0F0] hover:bg-[#1C1C1C] transition"
+              className="min-h-[44px] min-w-[44px] -mr-2 flex items-center justify-center rounded-xl text-[#96A2AE] hover:text-[#EDE9E0] hover:bg-[#182028] transition-colors"
               aria-label="Opções do audiolivro"
               aria-expanded={menuOpen}
               aria-haspopup="menu"
@@ -142,7 +178,7 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
             {menuOpen && (
               <div
                 role="menu"
-                className="absolute right-0 mt-1.5 w-56 rounded-xl bg-[#242424] border border-[#2E2E2E] py-1.5 shadow-lg z-40"
+                className="absolute right-0 mt-1.5 w-56 rounded-xl bg-[#212B36] border border-[#2A3642] py-1.5 shadow-xl z-40"
               >
                 <button
                   type="button"
@@ -151,9 +187,9 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
                     setMenuOpen(false);
                     onRequestRename(activeBook);
                   }}
-                  className="w-full min-h-[44px] px-4 flex items-center gap-3 text-left text-sm text-[#F0F0F0] hover:bg-[#2C2C2C] transition"
+                  className="w-full min-h-[44px] px-4 flex items-center gap-3 text-left text-sm text-[#EDE9E0] hover:bg-[#283442] transition-colors"
                 >
-                  <Pencil className="w-4 h-4 text-[#A0A0A0] shrink-0" aria-hidden="true" />
+                  <Pencil className="w-4 h-4 text-[#96A2AE] shrink-0" aria-hidden="true" />
                   <span>Renomear</span>
                 </button>
 
@@ -164,9 +200,9 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
                     setMenuOpen(false);
                     void restartCurrentBook();
                   }}
-                  className="w-full min-h-[44px] px-4 flex items-center gap-3 text-left text-sm text-[#F0F0F0] hover:bg-[#2C2C2C] transition"
+                  className="w-full min-h-[44px] px-4 flex items-center gap-3 text-left text-sm text-[#EDE9E0] hover:bg-[#283442] transition-colors"
                 >
-                  <RotateCcw className="w-4 h-4 text-[#A0A0A0] shrink-0" aria-hidden="true" />
+                  <RotateCcw className="w-4 h-4 text-[#96A2AE] shrink-0" aria-hidden="true" />
                   <span>Ouvir do início</span>
                 </button>
 
@@ -178,9 +214,9 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
                       setMenuOpen(false);
                       onMarkCompleted(activeBook);
                     }}
-                    className="w-full min-h-[44px] px-4 flex items-center gap-3 text-left text-sm text-[#F0F0F0] hover:bg-[#2C2C2C] transition"
+                    className="w-full min-h-[44px] px-4 flex items-center gap-3 text-left text-sm text-[#EDE9E0] hover:bg-[#283442] transition-colors"
                   >
-                    <Check className="w-4 h-4 text-[#A0A0A0] shrink-0" aria-hidden="true" />
+                    <Check className="w-4 h-4 text-[#96A2AE] shrink-0" aria-hidden="true" />
                     <span>Marcar como concluído</span>
                   </button>
                 )}
@@ -190,46 +226,117 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
         </div>
       </header>
 
-      {/* Main Player Surface */}
-      <main className="flex-1 w-full max-w-2xl mx-auto px-5 sm:px-8 py-6 sm:py-10 flex flex-col justify-between gap-8 pb-safe">
-        {/* Book Identity & Calm Acoustic Focal Anchor */}
-        <section className="flex-1 flex flex-col items-center justify-center text-center py-2">
-          <div className="w-36 h-36 sm:w-44 sm:h-44 rounded-3xl bg-[#1C1C1C] border border-[#2E2E2E] flex items-center justify-center mb-7">
-            <Headphones
-              className={`w-14 h-14 sm:w-16 sm:h-16 transition-colors duration-200 ${
-                isPlaying ? 'text-[#B5A58A]' : 'text-[#A0A0A0]'
-              }`}
-              strokeWidth={1.4}
-              aria-hidden="true"
-            />
+      {/* Main Listening Room Surface */}
+      <main className="flex-1 w-full max-w-5xl mx-auto px-5 sm:px-8 py-6 sm:py-10 flex flex-col lg:grid lg:grid-cols-12 lg:items-center lg:gap-12 justify-between gap-8 pb-safe">
+        {/* Focal Anchor: Tactile Acoustic Progress Dial & Book Title */}
+        <section className="flex-1 lg:col-span-6 flex flex-col items-center justify-center text-center py-1">
+          <div className="relative w-52 h-52 sm:w-60 sm:h-60 mb-7 select-none">
+            <svg
+              viewBox="0 0 240 240"
+              className="w-full h-full"
+              role="img"
+              aria-label={`Progresso de leitura: ${roundedPercent}%`}
+            >
+              {/* Subtle base plate */}
+              <circle
+                cx="120"
+                cy="120"
+                r="112"
+                fill="#182028"
+                stroke="#2A3642"
+                strokeWidth="1"
+              />
+
+              {/* 60 engraved acoustic dial ticks */}
+              {DIAL_TICKS.map((tick) => (
+                <line
+                  key={tick.key}
+                  x1={tick.x1}
+                  y1={tick.y1}
+                  x2={tick.x2}
+                  y2={tick.y2}
+                  stroke={tick.isMajor ? '#435365' : '#2A3642'}
+                  strokeWidth={tick.isMajor ? 1.4 : 1}
+                  strokeLinecap="round"
+                />
+              ))}
+
+              {/* Background progress track */}
+              <circle
+                cx="120"
+                cy="120"
+                r={arcRadius}
+                fill="none"
+                stroke="#212B36"
+                strokeWidth="4"
+              />
+
+              {/* Active brass bookmark progress arc */}
+              <circle
+                cx="120"
+                cy="120"
+                r={arcRadius}
+                fill="none"
+                stroke="#E0A458"
+                strokeWidth="4"
+                strokeLinecap="round"
+                strokeDasharray={arcCircumference}
+                strokeDashoffset={arcDashOffset}
+                transform="rotate(-90 120 120)"
+                className="transition-[stroke-dashoffset] duration-200"
+              />
+
+              {/* Inner quiet turntable ring with calm orbital cue only while playing */}
+              <circle
+                cx="120"
+                cy="120"
+                r="66"
+                fill="none"
+                stroke="#2A3642"
+                strokeWidth="1"
+              />
+
+              {isPlaying && (
+                <g className="origin-center animate-dial-orbit" style={{ transformOrigin: '120px 120px' }}>
+                  <circle cx="120" cy="54" r="3" fill="#E0A458" />
+                </g>
+              )}
+            </svg>
+
+            {/* Centered Book Monogram & Percentage */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+              <span
+                className={`font-display text-4xl sm:text-[42px] font-medium tracking-tight leading-none transition-colors duration-200 ${
+                  isPlaying ? 'text-[#EDE9E0]' : 'text-[#EDE9E0]/85'
+                }`}
+              >
+                {monogram}
+              </span>
+              {effectiveDuration > 0 && (
+                <span className="mt-2 text-xs font-medium text-[#E0A458] tabular-nums">
+                  {roundedPercent}%
+                </span>
+              )}
+            </div>
           </div>
 
-          <h1 className="text-xl sm:text-2xl font-semibold text-[#F0F0F0] leading-snug max-w-lg text-balance">
+          <h1 className="font-display text-2xl sm:text-[28px] font-medium text-[#EDE9E0] leading-snug max-w-md text-balance">
             {activeBook.customName}
           </h1>
 
-          <div className="mt-2.5 flex items-center justify-center gap-2 text-xs sm:text-sm text-[#A0A0A0]">
-            <span>{isPlaying ? 'Reproduzindo' : getStatusLabel(activeBook.status)}</span>
-            {effectiveDuration > 0 && (
-              <>
-                <span aria-hidden="true">·</span>
-                <span className="tabular-nums">
-                  {calculateProgressPercent(displayTime, effectiveDuration, activeBook.status)}%
-                  concluído
-                </span>
-              </>
-            )}
-          </div>
+          <p className="mt-2 text-sm text-[#96A2AE]">
+            {isPlaying ? 'Ouvindo agora' : getStatusLabel(activeBook.status)}
+          </p>
 
-          {/* Completed state action */}
+          {/* Completed state direct action */}
           {activeBook.status === 'completed' && !isPlaying && (
-            <div className="mt-6">
+            <div className="mt-5">
               <button
                 type="button"
                 onClick={() => void restartCurrentBook()}
-                className="inline-flex items-center justify-center gap-2 min-h-[44px] px-5 rounded-xl bg-[#242424] border border-[#2E2E2E] text-sm font-medium text-[#F0F0F0] hover:bg-[#2C2C2C] active:scale-[0.98] transition"
+                className="inline-flex items-center justify-center gap-2 min-h-[44px] px-5 rounded-xl bg-[#182028] border border-[#2A3642] text-sm font-medium text-[#EDE9E0] hover:bg-[#212B36] active:scale-[0.98] transition"
               >
-                <RotateCcw className="w-4 h-4 text-[#B5A58A]" aria-hidden="true" />
+                <RotateCcw className="w-4 h-4 text-[#E0A458]" aria-hidden="true" />
                 <span>Ouvir novamente do início</span>
               </button>
             </div>
@@ -239,24 +346,24 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
           {error && (
             <div
               role="alert"
-              className="mt-6 w-full max-w-md rounded-2xl bg-[#1C1C1C] border border-[#CF6679]/40 p-4 text-left space-y-3"
+              className="mt-6 w-full max-w-md rounded-2xl bg-[#182028] border border-[#E06C75]/45 p-4 text-left space-y-3"
             >
-              <div className="flex items-start gap-2.5 text-sm text-[#F0F0F0]">
-                <AlertCircle className="w-5 h-5 text-[#CF6679] shrink-0 mt-0.5" aria-hidden="true" />
+              <div className="flex items-start gap-2.5 text-sm text-[#EDE9E0]">
+                <AlertCircle className="w-5 h-5 text-[#E06C75] shrink-0 mt-0.5" aria-hidden="true" />
                 <p className="leading-relaxed">{error}</p>
               </div>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => void openAudiobook(activeBook, { autoPlay: true })}
-                  className="min-h-[44px] px-4 rounded-xl bg-[#242424] border border-[#2E2E2E] text-xs font-medium text-[#F0F0F0] hover:bg-[#2C2C2C] transition"
+                  className="min-h-[44px] px-4 rounded-xl bg-[#212B36] border border-[#2A3642] text-xs font-medium text-[#EDE9E0] hover:bg-[#283442] transition-colors"
                 >
                   Tentar novamente
                 </button>
                 <button
                   type="button"
                   onClick={handleBack}
-                  className="min-h-[44px] px-4 rounded-xl text-xs font-medium text-[#A0A0A0] hover:text-[#F0F0F0] transition"
+                  className="min-h-[44px] px-4 rounded-xl text-xs font-medium text-[#96A2AE] hover:text-[#EDE9E0] transition-colors"
                 >
                   Voltar à biblioteca
                 </button>
@@ -265,13 +372,16 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
           )}
         </section>
 
-        {/* Bottom Thumb-Zone Controls */}
-        <section className="space-y-6 pb-2" aria-label="Controles de reprodução">
+        {/* Bottom Thumb-Zone Controls (Right Column on Desktop) */}
+        <section
+          className="lg:col-span-6 w-full max-w-md mx-auto lg:max-w-none space-y-7 pb-2"
+          aria-label="Controles de reprodução"
+        >
           {/* Interactive Timeline Scrubber */}
           <div className="space-y-1">
             <div className="relative flex items-center">
               <div
-                className="pointer-events-none absolute left-0 right-0 h-[5px] rounded-full"
+                className="pointer-events-none absolute left-0 right-0 h-[4px] rounded-full"
                 style={scrubberTrackStyle}
                 aria-hidden="true"
               />
@@ -297,28 +407,24 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
               />
             </div>
 
-            <div className="flex items-center justify-between text-xs font-mono text-[#A0A0A0] tabular-nums">
+            <div className="flex items-center justify-between text-xs text-[#96A2AE] tabular-nums">
               <span>{formatTime(displayTime)}</span>
-              <span>
-                {effectiveDuration > 0
-                  ? `-${formatTime(remaining)} · ${formatTime(effectiveDuration)}`
-                  : '--:--'}
-              </span>
+              <span>{effectiveDuration > 0 ? `-${formatTime(remaining)}` : '--:--'}</span>
             </div>
           </div>
 
           {/* Primary Transport Buttons: -15s | Play/Pause | +30s */}
-          <div className="flex items-center justify-center gap-7 sm:gap-10">
+          <div className="flex items-center justify-center gap-8 sm:gap-11">
             <button
               type="button"
               onClick={() => seekBy(-15)}
               disabled={effectiveDuration <= 0}
-              className="w-14 h-14 rounded-full bg-[#1C1C1C] border border-[#2E2E2E] flex flex-col items-center justify-center text-[#F0F0F0] hover:bg-[#242424] active:scale-95 disabled:opacity-40 transition"
+              className="w-14 h-14 rounded-full bg-[#182028] border border-[#2A3642] flex flex-col items-center justify-center text-[#EDE9E0] hover:bg-[#212B36] active:scale-95 disabled:opacity-40 transition"
               aria-label="Retroceder 15 segundos"
             >
-              <RotateCcw className="w-5 h-5 text-[#A0A0A0]" strokeWidth={1.75} aria-hidden="true" />
-              <span className="text-[11px] font-mono tabular-nums leading-none mt-0.5 text-[#F0F0F0]">
-                15
+              <RotateCcw className="w-4 h-4 text-[#96A2AE]" strokeWidth={1.9} aria-hidden="true" />
+              <span className="text-[11px] font-medium tabular-nums leading-none mt-1 text-[#EDE9E0]">
+                15s
               </span>
             </button>
 
@@ -326,7 +432,7 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
               type="button"
               onClick={() => void togglePlayPause()}
               disabled={isLoading}
-              className="w-[72px] h-[72px] rounded-full bg-[#B5A58A] text-[#121212] flex items-center justify-center hover:bg-[#C6B79E] active:scale-95 disabled:opacity-60 transition"
+              className="w-[74px] h-[74px] rounded-full bg-[#E0A458] text-[#11161C] flex items-center justify-center hover:bg-[#ECB56F] active:scale-95 disabled:opacity-60 transition"
               aria-label={isPlaying ? 'Pausar' : 'Reproduzir'}
             >
               {isLoading ? (
@@ -342,23 +448,22 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
               type="button"
               onClick={() => seekBy(30)}
               disabled={effectiveDuration <= 0}
-              className="w-14 h-14 rounded-full bg-[#1C1C1C] border border-[#2E2E2E] flex flex-col items-center justify-center text-[#F0F0F0] hover:bg-[#242424] active:scale-95 disabled:opacity-40 transition"
+              className="w-14 h-14 rounded-full bg-[#182028] border border-[#2A3642] flex flex-col items-center justify-center text-[#EDE9E0] hover:bg-[#212B36] active:scale-95 disabled:opacity-40 transition"
               aria-label="Avançar 30 segundos"
             >
-              <RotateCw className="w-5 h-5 text-[#A0A0A0]" strokeWidth={1.75} aria-hidden="true" />
-              <span className="text-[11px] font-mono tabular-nums leading-none mt-0.5 text-[#F0F0F0]">
-                30
+              <RotateCw className="w-4 h-4 text-[#96A2AE]" strokeWidth={1.9} aria-hidden="true" />
+              <span className="text-[11px] font-medium tabular-nums leading-none mt-1 text-[#EDE9E0]">
+                30s
               </span>
             </button>
           </div>
 
-          {/* Playback Speed Selector */}
-          <div className="pt-1">
-            <p className="text-center text-xs text-[#A0A0A0] mb-2.5">Velocidade de reprodução</p>
+          {/* Clean 6-Stop Playback Speed Strip */}
+          <div className="pt-2 border-t border-[#2A3642]/70">
             <div
               role="radiogroup"
               aria-label="Velocidade de reprodução"
-              className="grid grid-cols-6 gap-1.5 p-1 rounded-xl bg-[#1C1C1C] border border-[#2E2E2E]"
+              className="grid grid-cols-6 gap-1 pt-2"
             >
               {PLAYBACK_RATES.map((rate) => {
                 const isSelected = playbackRate === rate;
@@ -369,10 +474,10 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
                     role="radio"
                     aria-checked={isSelected}
                     onClick={() => setPlaybackRate(rate)}
-                    className={`min-h-[44px] rounded-lg font-mono text-xs sm:text-sm tabular-nums transition whitespace-nowrap ${
+                    className={`min-h-[44px] rounded-lg text-xs sm:text-sm tabular-nums transition-colors whitespace-nowrap ${
                       isSelected
-                        ? 'bg-[#B5A58A] text-[#121212] font-semibold'
-                        : 'text-[#A0A0A0] hover:text-[#F0F0F0] hover:bg-[#242424]'
+                        ? 'bg-[#212B36] text-[#E0A458] font-semibold border border-[#E0A458]/40'
+                        : 'text-[#96A2AE] hover:text-[#EDE9E0] hover:bg-[#182028]'
                     }`}
                   >
                     {formatRate(rate)}

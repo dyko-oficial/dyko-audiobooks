@@ -26,6 +26,16 @@ export interface AudiobookRecord {
   playbackRate: PlaybackRate;
   status: AudiobookStatus;
   /**
+   * Byte size of the original source file as selected by the user (remains stable
+   * even if an MP4 is remuxed into a smaller audio-only .m4a copy).
+   */
+  originalFileSize?: number;
+  /**
+   * Fast sampled content hash (size + head/middle/tail slices) of the original source file
+   * used to prevent duplicate imports across single-file and folder selections.
+   */
+  contentHash?: string;
+  /**
    * True for native MP3 files and MP4 files whose video track was stripped (or never existed).
    * False/undefined for legacy or fallback full MP4 files containing a video track.
    */

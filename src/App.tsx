@@ -219,37 +219,37 @@ const AppShell: React.FC<AppShellProps> = ({
 
     if (failedMessages.length > 0) {
       setActionError(
-        `Não foi possível otimizar ${failedMessages.length === 1 ? '1 arquivo' : `${failedMessages.length} arquivos`} (a cópia original e o progresso foram mantidos): ${failedMessages.join(' · ')}`
+        `Não foi possível otimizar ${failedMessages.length === 1 ? '1 arquivo' : `${failedMessages.length} arquivos`} (a cópia original e o progresso foram mantidos): ${failedMessages.join('; ')}`
       );
     }
   };
 
   if (isLoadingBooks) {
     return (
-      <div className="min-h-[100dvh] flex flex-col items-center justify-center gap-3 bg-[#121212] px-6">
-        <Loader2 className="w-7 h-7 text-[#B5A58A] animate-spin" aria-hidden="true" />
-        <p className="text-sm text-[#A0A0A0]">Carregando biblioteca local...</p>
+      <div className="min-h-[100dvh] flex flex-col items-center justify-center gap-3 bg-[#11161C] px-6">
+        <Loader2 className="w-7 h-7 text-[#E0A458] animate-spin" aria-hidden="true" />
+        <p className="text-sm text-[#96A2AE]">Carregando biblioteca local...</p>
       </div>
     );
   }
 
   if (loadError) {
     return (
-      <div className="min-h-[100dvh] flex items-center justify-center bg-[#121212] px-5">
-        <div className="w-full max-w-md rounded-2xl bg-[#1C1C1C] border border-[#2E2E2E] p-6 space-y-4">
+      <div className="min-h-[100dvh] flex items-center justify-center bg-[#11161C] px-5">
+        <div className="w-full max-w-md rounded-2xl bg-[#182028] border border-[#2A3642] p-6 space-y-4">
           <div className="flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-[#CF6679] shrink-0 mt-0.5" aria-hidden="true" />
+            <AlertCircle className="w-5 h-5 text-[#E06C75] shrink-0 mt-0.5" aria-hidden="true" />
             <div>
-              <h1 className="text-base font-semibold text-[#F0F0F0]">
+              <h1 className="font-display text-lg font-medium text-[#EDE9E0]">
                 Erro ao recuperar dados locais
               </h1>
-              <p className="mt-1.5 text-sm text-[#A0A0A0] leading-relaxed">{loadError}</p>
+              <p className="mt-1.5 text-sm text-[#96A2AE] leading-relaxed">{loadError}</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onRetryLoad}
-            className="w-full min-h-[44px] rounded-xl bg-[#B5A58A] text-[#121212] text-sm font-semibold hover:bg-[#C6B79E] transition"
+            className="w-full min-h-[44px] rounded-xl bg-[#E0A458] text-[#11161C] text-sm font-semibold hover:bg-[#ECB56F] transition-colors"
           >
             Tentar novamente
           </button>
@@ -261,7 +261,7 @@ const AppShell: React.FC<AppShellProps> = ({
   // First-run screen when no audiobooks exist yet
   if (books.length === 0) {
     return (
-      <div className="min-h-[100dvh] bg-[#121212]">
+      <div className="min-h-[100dvh] bg-[#11161C]">
         <OfflineBanner />
         <ImportView
           existingBooks={books}
@@ -283,11 +283,11 @@ const AppShell: React.FC<AppShellProps> = ({
               parts.push(`${summary.unsupportedCount} arquivo(s) não suportado(s) ignorado(s).`);
             }
             if (summary.duplicates.length > 0) {
-              parts.push(`${summary.duplicates.length} duplicado(s) ignorado(s).`);
+              parts.push(`${summary.duplicates.length} já estava(m) na biblioteca.`);
             }
             if (summary.warnings.length > 0) {
               setActionError(
-                summary.warnings.map((w) => `${w.fileName}: ${w.message}`).join(' · ')
+                summary.warnings.map((w) => `${w.fileName}: ${w.message}`).join('; ')
               );
             }
             setImportNotice(parts.join(' '));
@@ -298,21 +298,21 @@ const AppShell: React.FC<AppShellProps> = ({
   }
 
   return (
-    <div className="min-h-[100dvh] bg-[#121212]">
+    <div className="min-h-[100dvh] bg-[#11161C]">
       <OfflineBanner />
 
       {importNotice && screen === 'library' && (
         <div
           role="status"
           aria-live="polite"
-          className="bg-[#1C1C1C] border-b border-[#2E2E2E] px-4 py-2.5 text-xs text-[#F0F0F0]"
+          className="bg-[#182028] border-b border-[#2A3642] px-4 py-2.5 text-xs text-[#EDE9E0]"
         >
-          <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
+          <div className="max-w-5xl mx-auto flex items-center justify-between gap-3">
             <span>{importNotice}</span>
             <button
               type="button"
               onClick={() => setImportNotice(null)}
-              className="text-[#B5A58A] font-medium shrink-0 px-2 py-1"
+              className="text-[#E0A458] font-medium shrink-0 px-2 py-1"
             >
               Fechar
             </button>
@@ -323,14 +323,14 @@ const AppShell: React.FC<AppShellProps> = ({
       {actionError && (
         <div
           role="alert"
-          className="bg-[#242424] border-b border-[#CF6679]/40 px-4 py-2.5 text-xs text-[#F0F0F0]"
+          className="bg-[#212B36] border-b border-[#E06C75]/45 px-4 py-2.5 text-xs text-[#EDE9E0]"
         >
-          <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
+          <div className="max-w-5xl mx-auto flex items-center justify-between gap-3">
             <span>{actionError}</span>
             <button
               type="button"
               onClick={() => setActionError(null)}
-              className="text-[#B5A58A] font-medium shrink-0 px-2 py-1"
+              className="text-[#E0A458] font-medium shrink-0 px-2 py-1"
             >
               Fechar
             </button>
@@ -438,7 +438,11 @@ export default function App() {
   }, []);
 
   const handleBooksAdded = useCallback((newBooks: AudiobookRecord[]) => {
-    setBooks((prev) => [...prev, ...newBooks]);
+    setBooks((prev) => {
+      const existingIds = new Set(prev.map((b) => b.id));
+      const uniqueNew = newBooks.filter((b) => !existingIds.has(b.id));
+      return uniqueNew.length > 0 ? [...prev, ...uniqueNew] : prev;
+    });
   }, []);
 
   const handleBookRemoved = useCallback((bookId: string) => {

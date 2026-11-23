@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { AlertCircle, CheckCircle2, FolderOpen, HardDrive, Headphones, Upload, X } from 'lucide-react';
+import { AlertCircle, CheckCircle2, FolderOpen, HardDrive, Upload, X } from 'lucide-react';
 import type {
   AudiobookRecord,
   ImportProgress,
@@ -127,7 +127,7 @@ export const ImportView: React.FC<ImportViewProps> = ({
   };
 
   const content = (
-    <div className="w-full max-w-lg mx-auto">
+    <div className={isModal ? 'w-full' : 'w-full max-w-xl mx-auto'}>
       <input
         ref={fileInputRef}
         type="file"
@@ -139,18 +139,21 @@ export const ImportView: React.FC<ImportViewProps> = ({
       />
 
       {isModal ? (
-        <div className="flex items-center justify-between gap-4 mb-5">
+        <div className="flex items-start justify-between gap-4 mb-5">
           <div>
-            <h2 className="text-lg font-semibold text-[#F0F0F0]">Importar audiolivros</h2>
-            <p className="text-xs text-[#A0A0A0] mt-0.5">
-              Os arquivos MP3 e MP4 serão copiados localmente para reprodução offline em áudio.
+            <h2 className="font-display text-xl font-medium text-[#EDE9E0]">
+              Importar audiolivros
+            </h2>
+            <p className="text-xs sm:text-sm text-[#96A2AE] mt-1 leading-relaxed">
+              Arquivos MP3, M4A e MP4 são copiados para o armazenamento local. Itens já presentes na
+              biblioteca não são duplicados.
             </p>
           </div>
           {onClose && !isImporting && (
             <button
               type="button"
               onClick={onClose}
-              className="min-h-[44px] min-w-[44px] -mr-2 flex items-center justify-center rounded-xl text-[#A0A0A0] hover:text-[#F0F0F0] hover:bg-[#242424] transition"
+              className="min-h-[44px] min-w-[44px] -mr-2 -mt-1 flex items-center justify-center rounded-xl text-[#96A2AE] hover:text-[#EDE9E0] hover:bg-[#212B36] transition-colors shrink-0"
               aria-label="Fechar janela de importação"
             >
               <X className="w-5 h-5" />
@@ -158,30 +161,28 @@ export const ImportView: React.FC<ImportViewProps> = ({
           )}
         </div>
       ) : (
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 rounded-2xl bg-[#1C1C1C] border border-[#2E2E2E] flex items-center justify-center mx-auto mb-5">
-            <Headphones className="w-8 h-8 text-[#B5A58A]" strokeWidth={1.75} aria-hidden="true" />
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-[#F0F0F0] text-balance">
-            Dyko Audiobooks
+        <div className="mb-9">
+          <p className="font-display text-base text-[#E0A458] font-medium">Dyko Audiobooks</p>
+          <h1 className="mt-3 font-display text-3xl sm:text-4xl font-medium tracking-tight text-[#EDE9E0] leading-[1.15] text-balance">
+            Sua estante de audiolivros, sempre offline
           </h1>
-          <p className="mt-3 text-sm sm:text-base text-[#A0A0A0] leading-relaxed max-w-md mx-auto">
-            Importe seus audiolivros em MP3 ou MP4 para ouvir offline, organizar sua biblioteca
-            pessoal e retomar exatamente de onde parou.
+          <p className="mt-4 text-sm sm:text-base text-[#96A2AE] leading-relaxed max-w-md">
+            Importe arquivos MP3 ou MP4 do seu aparelho para ouvir sem internet e retomar exatamente
+            do segundo em que parou.
           </p>
         </div>
       )}
 
       {/* Primary Action Area */}
-      <div className={isModal ? 'space-y-3' : 'rounded-2xl bg-[#1C1C1C] border border-[#2E2E2E] p-6 space-y-4'}>
+      <div className="space-y-3">
         <button
           type="button"
           disabled={isImporting}
           onClick={handleSelectFilesClick}
-          className="w-full min-h-[52px] px-5 py-3 rounded-xl bg-[#B5A58A] text-[#121212] font-semibold text-base flex items-center justify-center gap-2.5 hover:bg-[#C6B79E] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition"
+          className="w-full min-h-[52px] px-5 py-3 rounded-xl bg-[#E0A458] text-[#11161C] font-semibold text-base flex items-center justify-center gap-2.5 hover:bg-[#ECB56F] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition"
         >
           <Upload className="w-5 h-5 shrink-0" aria-hidden="true" />
-          <span>Importar audiolivros</span>
+          <span>Importar arquivos</span>
         </button>
 
         {supportsDirectory && (
@@ -189,24 +190,24 @@ export const ImportView: React.FC<ImportViewProps> = ({
             type="button"
             disabled={isImporting}
             onClick={() => void handleSelectDirectoryClick()}
-            className="w-full min-h-[48px] px-5 py-2.5 rounded-xl bg-[#242424] border border-[#2E2E2E] text-[#F0F0F0] font-medium text-sm flex items-center justify-center gap-2 hover:bg-[#2C2C2C] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition"
+            className="w-full min-h-[48px] px-5 py-2.5 rounded-xl bg-[#182028] border border-[#2A3642] text-[#EDE9E0] font-medium text-sm flex items-center justify-center gap-2 hover:bg-[#212B36] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition"
           >
-            <FolderOpen className="w-4 h-4 text-[#B5A58A] shrink-0" aria-hidden="true" />
-            <span>Selecionar pasta de audiolivros</span>
+            <FolderOpen className="w-4 h-4 text-[#E0A458] shrink-0" aria-hidden="true" />
+            <span>Selecionar pasta</span>
           </button>
         )}
 
-        <div className="pt-2 flex items-start gap-2.5 text-xs text-[#A0A0A0] leading-relaxed">
-          <HardDrive className="w-4 h-4 text-[#B5A58A] shrink-0 mt-0.5" aria-hidden="true" />
-          <div>
+        <div className="pt-4 mt-2 border-t border-[#2A3642]/70 flex items-start gap-3 text-xs text-[#96A2AE] leading-relaxed">
+          <HardDrive className="w-4 h-4 text-[#E0A458] shrink-0 mt-0.5" aria-hidden="true" />
+          <div className="space-y-1">
             <p>
-              Os arquivos são copiados para o armazenamento local do dispositivo e reproduzidos
-              totalmente offline. Seus arquivos originais nunca são alterados ou excluídos.
+              Cópias locais ficam salvas no aparelho e seus arquivos originais nunca são alterados
+              ou excluídos.
             </p>
             {storageInfo?.supported && (
-              <p className="mt-1.5 text-[#A0A0A0] tabular-nums">
+              <p className="tabular-nums">
                 Espaço disponível estimado:{' '}
-                <span className="text-[#F0F0F0] font-medium">
+                <span className="text-[#EDE9E0] font-medium">
                   {formatFileSize(storageInfo.available)}
                 </span>
               </p>
@@ -218,12 +219,12 @@ export const ImportView: React.FC<ImportViewProps> = ({
       {/* Active Import Progress */}
       {isImporting && progress && (
         <div
-          className="mt-4 rounded-2xl bg-[#1C1C1C] border border-[#2E2E2E] p-4 space-y-3"
+          className="mt-5 rounded-xl bg-[#182028] border border-[#2A3642] p-4 space-y-3"
           role="status"
           aria-live="polite"
         >
           <div className="flex items-center justify-between gap-3 text-sm">
-            <span className="font-medium text-[#F0F0F0] truncate">
+            <span className="font-medium text-[#EDE9E0] truncate">
               {progress.phase === 'scanning'
                 ? 'Lendo pasta...'
                 : progress.phase === 'checking'
@@ -232,20 +233,20 @@ export const ImportView: React.FC<ImportViewProps> = ({
                     ? `Extraindo áudio ${progress.processedFiles + 1} de ${progress.totalFiles}`
                     : `Copiando ${progress.processedFiles + 1} de ${progress.totalFiles}`}
             </span>
-            <span className="font-mono text-xs text-[#B5A58A] tabular-nums shrink-0">
+            <span className="text-xs font-medium text-[#E0A458] tabular-nums shrink-0">
               {progress.overallPercent}%
             </span>
           </div>
 
-          <div className="w-full h-1.5 rounded-full bg-[#2E2E2E] overflow-hidden">
+          <div className="w-full h-1.5 rounded-full bg-[#2A3642] overflow-hidden">
             <div
-              className="h-full bg-[#B5A58A] transition-all duration-150"
+              className="h-full bg-[#E0A458] transition-all duration-150"
               style={{ width: `${Math.max(4, progress.overallPercent)}%` }}
             />
           </div>
 
           {progress.currentFileName && (
-            <p className="text-xs text-[#A0A0A0] truncate">{progress.currentFileName}</p>
+            <p className="text-xs text-[#96A2AE] truncate">{progress.currentFileName}</p>
           )}
         </div>
       )}
@@ -254,18 +255,18 @@ export const ImportView: React.FC<ImportViewProps> = ({
       {errorMessage && (
         <div
           role="alert"
-          className="mt-4 rounded-2xl bg-[#242424] border border-[#CF6679]/40 p-4 flex items-start gap-3 text-sm text-[#F0F0F0]"
+          className="mt-5 rounded-xl bg-[#212B36] border border-[#E06C75]/45 p-4 flex items-start gap-3 text-sm text-[#EDE9E0]"
         >
-          <AlertCircle className="w-5 h-5 text-[#CF6679] shrink-0 mt-0.5" aria-hidden="true" />
+          <AlertCircle className="w-5 h-5 text-[#E06C75] shrink-0 mt-0.5" aria-hidden="true" />
           <p className="leading-relaxed">{errorMessage}</p>
         </div>
       )}
 
       {/* Import Result Summary */}
       {result && !isImporting && (
-        <div className="mt-4 rounded-2xl bg-[#1C1C1C] border border-[#2E2E2E] p-4 space-y-2.5 text-sm">
+        <div className="mt-5 rounded-xl bg-[#11161C] border border-[#2A3642] p-4 space-y-2.5 text-sm">
           {result.insufficientStorage && (
-            <div className="flex items-start gap-2.5 text-[#CF6679]">
+            <div className="flex items-start gap-2.5 text-[#E06C75]">
               <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" aria-hidden="true" />
               <p className="leading-relaxed">
                 Armazenamento insuficiente. Necessário:{' '}
@@ -282,8 +283,8 @@ export const ImportView: React.FC<ImportViewProps> = ({
           )}
 
           {result.imported.length > 0 && (
-            <div className="flex items-center gap-2.5 text-[#F0F0F0]">
-              <CheckCircle2 className="w-5 h-5 text-[#B5A58A] shrink-0" aria-hidden="true" />
+            <div className="flex items-center gap-2.5 text-[#EDE9E0]">
+              <CheckCircle2 className="w-5 h-5 text-[#E0A458] shrink-0" aria-hidden="true" />
               <span>
                 {result.imported.length === 1
                   ? '1 audiolivro importado com sucesso.'
@@ -292,27 +293,44 @@ export const ImportView: React.FC<ImportViewProps> = ({
             </div>
           )}
 
-          {result.duplicates.length > 0 && (
-            <p className="text-xs text-[#A0A0A0]">
-              {result.duplicates.length === 1
-                ? '1 arquivo ignorado por já estar na biblioteca.'
-                : `${result.duplicates.length} arquivos ignorados por já estarem na biblioteca.`}
-            </p>
-          )}
+          {result.imported.length === 0 &&
+            result.duplicates.length > 0 &&
+            result.failed.length === 0 &&
+            !result.insufficientStorage && (
+              <div className="flex items-start gap-2.5 text-[#EDE9E0]">
+                <CheckCircle2 className="w-5 h-5 text-[#E0A458] shrink-0 mt-0.5" aria-hidden="true" />
+                <span className="leading-relaxed">
+                  {result.duplicates.length === 1
+                    ? 'Este arquivo já está na sua biblioteca e não foi importado novamente.'
+                    : `Todos os ${result.duplicates.length} arquivos selecionados já estão na biblioteca e não foram importados novamente.`}
+                </span>
+              </div>
+            )}
+
+          {result.duplicates.length > 0 &&
+            (result.imported.length > 0 ||
+              result.failed.length > 0 ||
+              Boolean(result.insufficientStorage)) && (
+              <p className="text-xs text-[#96A2AE]">
+                {result.duplicates.length === 1
+                  ? '1 arquivo já estava na biblioteca e não foi importado novamente.'
+                  : `${result.duplicates.length} arquivos já estavam na biblioteca e não foram importados novamente.`}
+              </p>
+            )}
 
           {result.unsupportedCount > 0 && (
-            <p className="text-xs text-[#A0A0A0]">
+            <p className="text-xs text-[#96A2AE]">
               {result.unsupportedCount === 1
-                ? '1 arquivo ignorado por não ser formato MP3 ou MP4 suportado.'
-                : `${result.unsupportedCount} arquivos ignorados por não serem formato MP3 ou MP4 suportado.`}
+                ? '1 arquivo ignorado por não ser MP3, M4A ou MP4.'
+                : `${result.unsupportedCount} arquivos ignorados por não serem MP3, M4A ou MP4.`}
             </p>
           )}
 
           {result.optimizedCount > 0 && (
-            <p className="text-xs text-[#A0A0A0]">
+            <p className="text-xs text-[#96A2AE]">
               {result.optimizedCount === 1
-                ? '1 arquivo MP4 teve a faixa de áudio isolada (sem vídeo) para reprodução contínua em segundo plano.'
-                : `${result.optimizedCount} arquivos MP4 tiveram a faixa de áudio isolada (sem vídeo) para reprodução contínua em segundo plano.`}
+                ? '1 MP4 teve o áudio isolado sem vídeo para reprodução contínua em segundo plano.'
+                : `${result.optimizedCount} MP4s tiveram o áudio isolado sem vídeo para reprodução contínua em segundo plano.`}
             </p>
           )}
 
@@ -321,9 +339,9 @@ export const ImportView: React.FC<ImportViewProps> = ({
               {result.warnings.map((warn) => (
                 <div
                   key={warn.fileName}
-                  className="rounded-xl bg-[#242424] border border-[#B5A58A]/35 p-3 flex items-start gap-2.5 text-xs text-[#F0F0F0]"
+                  className="rounded-xl bg-[#182028] border border-[#E0A458]/35 p-3 flex items-start gap-2.5 text-xs text-[#EDE9E0]"
                 >
-                  <AlertCircle className="w-4 h-4 text-[#B5A58A] shrink-0 mt-0.5" aria-hidden="true" />
+                  <AlertCircle className="w-4 h-4 text-[#E0A458] shrink-0 mt-0.5" aria-hidden="true" />
                   <p className="leading-relaxed">
                     <span className="font-medium">{warn.fileName}:</span> {warn.message}
                   </p>
@@ -335,7 +353,7 @@ export const ImportView: React.FC<ImportViewProps> = ({
           {result.failed.length > 0 && (
             <div className="space-y-1 pt-1">
               {result.failed.map((item) => (
-                <p key={item.fileName} className="text-xs text-[#CF6679]">
+                <p key={item.fileName} className="text-xs text-[#E06C75]">
                   {item.fileName}: {item.reason}
                 </p>
               ))}
@@ -347,7 +365,7 @@ export const ImportView: React.FC<ImportViewProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="w-full min-h-[44px] rounded-xl bg-[#242424] border border-[#2E2E2E] text-sm font-medium text-[#F0F0F0] hover:bg-[#2C2C2C] transition"
+                className="w-full min-h-[44px] rounded-xl bg-[#212B36] border border-[#2A3642] text-sm font-medium text-[#EDE9E0] hover:bg-[#283442] transition-colors"
               >
                 Voltar à biblioteca
               </button>
@@ -357,7 +375,7 @@ export const ImportView: React.FC<ImportViewProps> = ({
       )}
 
       {!isModal && (
-        <div className="mt-6 flex justify-center">
+        <div className="mt-8">
           <PWAInstallButton variant="card" />
         </div>
       )}
@@ -367,13 +385,13 @@ export const ImportView: React.FC<ImportViewProps> = ({
   if (isModal) {
     return (
       <div
-        className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/75 p-0 sm:p-4"
+        className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-[#090C10]/80 backdrop-blur-xs p-0 sm:p-4"
         role="dialog"
         aria-modal="true"
         aria-label="Importar audiolivros"
       >
-        <div className="w-full sm:max-w-lg rounded-t-3xl sm:rounded-2xl bg-[#1C1C1C] border-t sm:border border-[#2E2E2E] p-5 sm:p-6 pb-safe max-h-[90dvh] overflow-y-auto">
-          <div className="w-10 h-1 rounded-full bg-[#2E2E2E] mx-auto mb-4 sm:hidden" aria-hidden="true" />
+        <div className="w-full sm:max-w-lg rounded-t-3xl sm:rounded-2xl bg-[#182028] border-t sm:border border-[#2A3642] p-6 pb-safe max-h-[90dvh] overflow-y-auto">
+          <div className="w-10 h-1 rounded-full bg-[#2A3642] mx-auto mb-5 sm:hidden" aria-hidden="true" />
           {content}
         </div>
       </div>
@@ -381,7 +399,7 @@ export const ImportView: React.FC<ImportViewProps> = ({
   }
 
   return (
-    <main className="min-h-[100dvh] flex flex-col justify-center px-5 py-10 bg-[#121212]">
+    <main className="min-h-[100dvh] flex flex-col justify-center px-6 py-12 bg-[#11161C]">
       {content}
     </main>
   );

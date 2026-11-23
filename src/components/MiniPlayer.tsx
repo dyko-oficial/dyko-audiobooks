@@ -1,5 +1,5 @@
 import React from 'react';
-import { Headphones, Loader2, Pause, Play } from 'lucide-react';
+import { Loader2, Pause, Play } from 'lucide-react';
 import { useAudioController } from '../playback/audioController';
 import { calculateProgressPercent, formatTime } from '../utils/format';
 
@@ -18,34 +18,43 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onOpenPlayer }) => {
 
   return (
     <div
-      className="fixed bottom-0 left-0 right-0 z-30 bg-[#1C1C1C] border-t border-[#2E2E2E] pb-safe"
+      className="fixed bottom-0 left-0 right-0 z-30 bg-[#182028]/95 backdrop-blur-md border-t border-[#2A3642] pb-safe"
       role="region"
       aria-label="Reprodução atual"
     >
-      {/* Subtle 2px progress line at top edge */}
-      <div className="w-full h-[2px] bg-[#2E2E2E]">
+      {/* 2px brass bookmark progress rule along top edge */}
+      <div className="w-full h-[2px] bg-[#2A3642]">
         <div
-          className="h-full bg-[#B5A58A] transition-all duration-300"
+          className="h-full bg-[#E0A458] transition-all duration-300"
           style={{ width: `${percent}%` }}
         />
       </div>
 
-      <div className="max-w-4xl mx-auto h-16 px-3 sm:px-6 flex items-center gap-3">
+      <div className="max-w-5xl mx-auto h-16 px-4 sm:px-6 flex items-center gap-3">
         <button
           type="button"
           onClick={onOpenPlayer}
-          className="flex-1 min-w-0 min-h-[48px] flex items-center gap-3 text-left rounded-lg focus-visible:outline-[#B5A58A]"
+          className="flex-1 min-w-0 min-h-[48px] flex items-center gap-3 text-left rounded-lg focus-visible:outline-[#E0A458]"
           aria-label={`Abrir player para ${activeBook.customName}`}
         >
-          <div className="w-10 h-10 rounded-xl bg-[#242424] border border-[#2E2E2E] flex items-center justify-center shrink-0">
-            <Headphones className="w-5 h-5 text-[#B5A58A]" strokeWidth={1.75} aria-hidden="true" />
+          {/* Vertical bookmark progress indicator */}
+          <div
+            className="w-1 h-9 rounded-full bg-[#2A3642] overflow-hidden flex flex-col justify-end shrink-0"
+            aria-hidden="true"
+          >
+            <div
+              className="w-full bg-[#E0A458] rounded-full transition-all duration-300"
+              style={{ height: `${Math.max(12, percent)}%` }}
+            />
           </div>
 
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-[#F0F0F0] truncate">{activeBook.customName}</p>
-            <p className="text-xs text-[#A0A0A0] font-mono tabular-nums truncate mt-0.5">
+            <p className="font-display text-[15px] font-medium text-[#EDE9E0] truncate leading-snug">
+              {activeBook.customName}
+            </p>
+            <p className="text-xs text-[#96A2AE] tabular-nums truncate mt-0.5">
               {formatTime(currentTime)}
-              {effectiveDuration > 0 ? ` / ${formatTime(effectiveDuration)}` : ''}
+              {effectiveDuration > 0 ? ` de ${formatTime(effectiveDuration)}` : ''}
             </p>
           </div>
         </button>
@@ -54,7 +63,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onOpenPlayer }) => {
           type="button"
           onClick={() => void togglePlayPause()}
           disabled={isLoading}
-          className="min-h-[44px] min-w-[44px] rounded-full bg-[#B5A58A] text-[#121212] flex items-center justify-center hover:bg-[#C6B79E] active:scale-95 disabled:opacity-60 transition shrink-0"
+          className="min-h-[44px] min-w-[44px] rounded-full bg-[#E0A458] text-[#11161C] flex items-center justify-center hover:bg-[#ECB56F] active:scale-95 disabled:opacity-60 transition shrink-0"
           aria-label={isPlaying ? 'Pausar audiolivro' : 'Reproduzir audiolivro'}
         >
           {isLoading ? (

@@ -4,7 +4,7 @@ import type {
   ImportProgress,
   ImportResult,
 } from '../types/audiobook';
-import { putAudiobook, updateAudiobookFields } from '../storage/db';
+import { getAllAudiobooks, putAudiobook, updateAudiobookFields } from '../storage/db';
 import {
   deleteAudioFile,
   getAudioFile,
@@ -69,8 +69,122 @@ export function needsMp4Optimization(book: AudiobookRecord): boolean {
   );
 }
 
+export function normalizeFileNameForKey(fileName: string): string {
+  return fileName.normalize('NFC').trim().toLowerCase();
+}
+
+export function computeNameSizeKey(fileName: string, size: number): string {
+  return `${normalizeFileNameForKey(fileName)}::${size}`;
+}
+
 export function computeFileFingerprint(file: File): string {
-  return `${file.name.toLowerCase().trim()}::${file.size}::${file.lastModified}`;
+  return `${normalizeFileNameForKey(file.name)}::${file.size}::${file.lastModified}`;
+}
+
+/**
+ * Extracts all known normalized `name::size` keys from an existing AudiobookRecord,
+ * including the original pre-optimization file size encoded in legacy fingerprints.
+ */
+export function extractExistingNameSizeKeys(book: AudiobookRecord): string[] {
+  const keys = new Set<string>();
+
+  if (typeof book.originalFileSize === 'number' && book.originalFileSize > 0) {
+    keys.add(computeNameSizeKey(book.originalName, book.originalFileSize));
+  }
+
+  if (typeof book.fileSize === 'number' && book.fileSize > 0) {
+    keys.add(computeNameSizeKey(book.originalName, book.fileSize));
+  }
+
+  // Parse legacy fingerprint format: `${name}::${originalSize}::${lastModified}`
+  // Split from the right so filenames containing '::' are parsed safely.
+  if (book.fingerprint) {
+    const lastSep = book.fingerprint.lastIndexOf('::');
+    if (lastSep > 0) {
+      const prevSep = book.fingerprint.lastIndexOf('::', lastSep - 1);
+      if (prevSep > 0) {
+        const fpName = book.fingerprint.slice(0, prevSep);
+        const fpSize = Number(book.fingerprint.slice(prevSep + 2, lastSep));
+        if (Number.isFinite(fpSize) && fpSize > 0) {
+          keys.add(computeNameSizeKey(fpName || book.originalName, fpSize));
+          keys.add(computeNameSizeKey(book.originalName, fpSize));
+        }
+      }
+    }
+  }
+
+  return Array.from(keys);
+}
+
+const HASH_SAMPLE_BYTES = 64 * 1024; // 64 KB per sample window (<= 192 KB total read)
+
+function fallbackDigestHex(bytes: Uint8Array): string {
+  let h1 = 0x811c9dc5;
+  let h2 = 0x9e3779b9;
+  for (let i = 0; i < bytes.length; i++) {
+    const b = bytes[i];
+    h1 ^= b;
+    h1 = Math.imul(h1, 0x01000193);
+    h2 ^= b + ((i & 0xff) ^ 0xa5);
+    h2 = Math.imul(h2, 0x85ebca6b);
+  }
+  return (h1 >>> 0).toString(16).padStart(8, '0') + (h2 >>> 0).toString(16).padStart(8, '0');
+}
+
+/**
+ * Computes a fast sampled content hash (size + head/middle/tail 64 KB windows)
+ * without loading multi-hour audio/MP4 files into RAM.
+ */
+export async function computePartialContentHash(blob: Blob): Promise<string> {
+  const size = blob.size;
+  const sizeHeader = new Uint8Array(8);
+  const view = new DataView(sizeHeader.buffer);
+  view.setUint32(0, Math.floor(size / 4294967296), false);
+  view.setUint32(4, size >>> 0, false);
+
+  let sampleParts: Uint8Array[];
+  if (size <= HASH_SAMPLE_BYTES * 3) {
+    const full = new Uint8Array(await blob.arrayBuffer());
+    sampleParts = [sizeHeader, full];
+  } else {
+    const midStart = Math.floor((size - HASH_SAMPLE_BYTES) / 2);
+    const tailStart = size - HASH_SAMPLE_BYTES;
+    const [headBuf, midBuf, tailBuf] = await Promise.all([
+      blob.slice(0, HASH_SAMPLE_BYTES).arrayBuffer(),
+      blob.slice(midStart, midStart + HASH_SAMPLE_BYTES).arrayBuffer(),
+      blob.slice(tailStart, size).arrayBuffer(),
+    ]);
+    sampleParts = [
+      sizeHeader,
+      new Uint8Array(headBuf),
+      new Uint8Array(midBuf),
+      new Uint8Array(tailBuf),
+    ];
+  }
+
+  const totalLen = sampleParts.reduce((acc, p) => acc + p.byteLength, 0);
+  const combined = new Uint8Array(totalLen);
+  let offset = 0;
+  for (const part of sampleParts) {
+    combined.set(part, offset);
+    offset += part.byteLength;
+  }
+
+  if (typeof crypto !== 'undefined' && crypto.subtle && typeof crypto.subtle.digest === 'function') {
+    try {
+      const digestBuf = await crypto.subtle.digest('SHA-256', combined);
+      const digestBytes = new Uint8Array(digestBuf);
+      let hex = '';
+      for (let i = 0; i < digestBytes.length; i++) {
+        hex += digestBytes[i].toString(16).padStart(2, '0');
+      }
+      return `v1:${size}:${hex}`;
+    } catch {
+      // Fall back to deterministic hash if WebCrypto is unavailable in current context
+    }
+  }
+
+  return `v1f:${size}:${fallbackDigestHex(combined)}`;
 }
 
 function generateId(): string {
@@ -322,9 +436,45 @@ export async function importAudioFiles(
 
   await requestPersistentStorage();
 
-  const existingFingerprints = new Set(existingBooks.map((b) => b.fingerprint));
-  const seenInBatch = new Set<string>();
-  const filesToImport: File[] = [];
+  // Always merge live IndexedDB records with React state so previously imported files
+  // are never missed even across consecutive imports or before state flushes.
+  const persistedBooks = await getAllAudiobooks().catch(() => []);
+  const libraryById = new Map<string, AudiobookRecord>();
+  for (const book of existingBooks) {
+    libraryById.set(book.id, book);
+  }
+  for (const book of persistedBooks) {
+    libraryById.set(book.id, book);
+  }
+  const allExistingBooks = Array.from(libraryById.values());
+
+  const existingFingerprints = new Set<string>();
+  const existingNameSizeKeys = new Set<string>();
+  const existingContentHashes = new Set<string>();
+
+  for (const book of allExistingBooks) {
+    if (book.fingerprint) {
+      existingFingerprints.add(book.fingerprint);
+    }
+    for (const key of extractExistingNameSizeKeys(book)) {
+      existingNameSizeKeys.add(key);
+    }
+    if (book.contentHash) {
+      existingContentHashes.add(book.contentHash);
+    }
+  }
+
+  const seenFingerprintsInBatch = new Set<string>();
+  const seenNameSizeInBatch = new Set<string>();
+  const seenContentHashesInBatch = new Set<string>();
+
+  interface QueuedImportFile {
+    file: File;
+    fingerprint: string;
+    contentHash: string;
+  }
+
+  const filesToImport: QueuedImportFile[] = [];
 
   for (const file of rawFiles) {
     if (!isSupportedAudioFile(file)) {
@@ -338,13 +488,40 @@ export async function importAudioFiles(
     }
 
     const fp = computeFileFingerprint(file);
-    if (existingFingerprints.has(fp) || seenInBatch.has(fp)) {
+    const nameSizeKey = computeNameSizeKey(file.name, file.size);
+
+    if (
+      existingFingerprints.has(fp) ||
+      seenFingerprintsInBatch.has(fp) ||
+      existingNameSizeKeys.has(nameSizeKey) ||
+      seenNameSizeInBatch.has(nameSizeKey)
+    ) {
       result.duplicates.push(file.name);
       continue;
     }
 
-    seenInBatch.add(fp);
-    filesToImport.push(file);
+    let contentHash = '';
+    try {
+      contentHash = await computePartialContentHash(file);
+    } catch {
+      contentHash = '';
+    }
+
+    if (
+      contentHash &&
+      (existingContentHashes.has(contentHash) || seenContentHashesInBatch.has(contentHash))
+    ) {
+      result.duplicates.push(file.name);
+      continue;
+    }
+
+    seenFingerprintsInBatch.add(fp);
+    seenNameSizeInBatch.add(nameSizeKey);
+    if (contentHash) {
+      seenContentHashesInBatch.add(contentHash);
+    }
+
+    filesToImport.push({ file, fingerprint: fp, contentHash });
   }
 
   if (filesToImport.length === 0) {
@@ -360,9 +537,9 @@ export async function importAudioFiles(
   }
 
   // Conservative quota pre-check: full size for MP3/M4A, estimated ~20% audio ratio for MP4 (exact check runs on fallback)
-  const estimatedBytesNeeded = filesToImport.reduce((acc, f) => {
-    const isMp4 = isMp4ContainerFile(f.name, f.type);
-    return acc + (isMp4 ? Math.round(f.size * 0.2) : f.size);
+  const estimatedBytesNeeded = filesToImport.reduce((acc, item) => {
+    const isMp4 = isMp4ContainerFile(item.file.name, item.file.type);
+    return acc + (isMp4 ? Math.round(item.file.size * 0.2) : item.file.size);
   }, 0);
 
   const estimate = await getStorageEstimate();
@@ -388,7 +565,7 @@ export async function importAudioFiles(
   const totalToImport = filesToImport.length;
 
   for (let i = 0; i < totalToImport; i++) {
-    const file = filesToImport[i];
+    const { file, fingerprint, contentHash } = filesToImport[i];
     const baseOverall = (i / totalToImport) * 100;
     const isMp4 = isMp4ContainerFile(file.name, file.type);
 
@@ -403,7 +580,6 @@ export async function importAudioFiles(
 
     try {
       const id = generateId();
-      const fingerprint = computeFileFingerprint(file);
 
       // Verify remaining space before each non-MP4 file
       if (!isMp4) {
@@ -441,6 +617,8 @@ export async function importAudioFiles(
         storageType: stored.storageType,
         storageKey: stored.storageKey,
         fileSize: stored.fileSize,
+        originalFileSize: file.size,
+        contentHash: contentHash || undefined,
         mimeType: stored.mimeType,
         lastModified: file.lastModified || Date.now(),
         duration: stored.duration,

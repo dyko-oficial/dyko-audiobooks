@@ -1,13 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  AudioLines,
   ArrowUpDown,
-  BookOpen,
+  AudioLines,
   Check,
-  Headphones,
   Loader2,
   MoreVertical,
+  Pause,
   Pencil,
+  Play,
   Plus,
   RotateCcw,
   Trash2,
@@ -51,9 +51,9 @@ const FILTER_TABS: Array<{ value: FilterOption; label: string }> = [
 ];
 
 const SORT_OPTIONS: Array<{ value: SortOption; label: string }> = [
-  { value: 'lastPlayedAt', label: 'Última reprodução' },
-  { value: 'importedAt', label: 'Data de adição' },
-  { value: 'name', label: 'Nome' },
+  { value: 'lastPlayedAt', label: 'Recentes' },
+  { value: 'importedAt', label: 'Adicionados' },
+  { value: 'name', label: 'Título' },
 ];
 
 export const LibraryView: React.FC<LibraryViewProps> = ({
@@ -68,7 +68,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   onOptimizeBooks,
   optimizationProgress,
 }) => {
-  const { activeBook, isPlaying } = useAudioController();
+  const { activeBook, isPlaying, togglePlayPause } = useAudioController();
   const [filter, setFilter] = useState<FilterOption>('all');
   const [sortBy, setSortBy] = useState<SortOption>('lastPlayedAt');
   const [openMenuBookId, setOpenMenuBookId] = useState<string | null>(null);
@@ -121,6 +121,18 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     [books]
   );
 
+  // Featured "Continue listening" spotlight: active book or most recently played in-progress book
+  const resumeBook = useMemo(() => {
+    if (activeBook) {
+      return books.find((b) => b.id === activeBook.id) ?? activeBook;
+    }
+    const inProgressBooks = books.filter((b) => b.status === 'in_progress');
+    if (inProgressBooks.length === 0) return null;
+    return [...inProgressBooks].sort(
+      (a, b) => (b.lastPlayedAt ?? b.importedAt) - (a.lastPlayedAt ?? a.importedAt)
+    )[0];
+  }, [activeBook, books]);
+
   const filteredAndSortedBooks = useMemo(() => {
     const filtered = filter === 'all' ? books : books.filter((b) => b.status === filter);
     return [...filtered].sort((a, b) => {
@@ -130,7 +142,6 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
       if (sortBy === 'importedAt') {
         return b.importedAt - a.importedAt;
       }
-      // lastPlayedAt: most recently played first, fallback to importedAt
       const aPlayed = a.lastPlayedAt ?? 0;
       const bPlayed = b.lastPlayedAt ?? 0;
       if (aPlayed !== bPlayed) return bPlayed - aPlayed;
@@ -138,22 +149,29 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     });
   }, [books, filter, sortBy]);
 
+  const resumePercent = resumeBook
+    ? calculateProgressPercent(resumeBook.currentTime, resumeBook.duration, resumeBook.status)
+    : 0;
+  const resumeRemaining =
+    resumeBook && resumeBook.duration > 0
+      ? Math.max(0, resumeBook.duration - resumeBook.currentTime)
+      : 0;
+  const isResumeBookActive = Boolean(resumeBook && activeBook?.id === resumeBook.id);
+
   return (
-    <div ref={menuContainerRef} className={activeBook ? 'pb-24' : 'pb-10'}>
-      {/* Sticky Top App Bar (compact 56px) */}
-      <header className="sticky top-0 z-20 bg-[#121212]/95 backdrop-blur-sm border-b border-[#2E2E2E] pt-safe">
-        <div className="max-w-4xl mx-auto h-14 px-4 sm:px-6 flex items-center justify-between gap-3">
-          <h1 className="text-base sm:text-lg font-semibold tracking-tight text-[#F0F0F0] whitespace-nowrap shrink-0">
+    <div ref={menuContainerRef} className={activeBook ? 'pb-24' : 'pb-12'}>
+      {/* Sticky 56px Top Bar: strictly 2 sides, zero crowding on 360px phones */}
+      <header className="sticky top-0 z-20 bg-[#11161C]/95 backdrop-blur-sm border-b border-[#2A3642]/70 pt-safe">
+        <div className="max-w-5xl mx-auto h-14 px-4 sm:px-6 flex items-center justify-between gap-3">
+          <h1 className="font-display text-lg sm:text-xl font-medium tracking-tight text-[#EDE9E0] whitespace-nowrap shrink-0">
             Dyko Audiobooks
           </h1>
 
-          <div className="flex items-center gap-2 shrink-0">
-            <PWAInstallButton variant="header" />
-
+          <div className="flex items-center gap-1.5 shrink-0">
             <button
               type="button"
               onClick={onOpenImport}
-              className="inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3.5 rounded-xl bg-[#B5A58A] text-[#121212] text-xs sm:text-sm font-semibold hover:bg-[#C6B79E] active:scale-[0.98] transition whitespace-nowrap shrink-0"
+              className="inline-flex items-center justify-center gap-1.5 min-h-[40px] px-3.5 rounded-xl bg-[#E0A458] text-[#11161C] text-xs sm:text-sm font-semibold hover:bg-[#ECB56F] active:scale-[0.98] transition whitespace-nowrap shrink-0"
             >
               <Plus className="w-4 h-4 shrink-0" aria-hidden="true" />
               <span>Importar</span>
@@ -166,7 +184,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                   setHeaderMenuOpen((prev) => !prev);
                   setOpenMenuBookId(null);
                 }}
-                className="min-h-[44px] min-w-[44px] -mr-1.5 flex items-center justify-center rounded-xl text-[#A0A0A0] hover:text-[#F0F0F0] hover:bg-[#1C1C1C] transition"
+                className="min-h-[44px] min-w-[44px] -mr-2 flex items-center justify-center rounded-xl text-[#96A2AE] hover:text-[#EDE9E0] hover:bg-[#182028] transition-colors"
                 aria-label="Mais opções da biblioteca"
                 aria-expanded={headerMenuOpen}
                 aria-haspopup="menu"
@@ -177,8 +195,12 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
               {headerMenuOpen && (
                 <div
                   role="menu"
-                  className="absolute right-0 mt-1.5 w-60 rounded-xl bg-[#242424] border border-[#2E2E2E] py-1.5 shadow-lg z-40"
+                  className="absolute right-0 mt-1.5 w-60 rounded-xl bg-[#212B36] border border-[#2A3642] py-1.5 shadow-xl z-40"
                 >
+                  <PWAInstallButton
+                    variant="menu"
+                    onAction={() => setHeaderMenuOpen(false)}
+                  />
                   <button
                     type="button"
                     role="menuitem"
@@ -186,7 +208,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                       setHeaderMenuOpen(false);
                       onRequestDeleteAll();
                     }}
-                    className="w-full min-h-[44px] px-4 flex items-center gap-3 text-left text-sm text-[#CF6679] hover:bg-[#2C2C2C] transition"
+                    className="w-full min-h-[44px] px-4 flex items-center gap-3 text-left text-sm text-[#E06C75] hover:bg-[#283442] transition-colors"
                   >
                     <Trash2 className="w-4 h-4 shrink-0" aria-hidden="true" />
                     <span>Remover todos os audiolivros</span>
@@ -198,115 +220,177 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 pt-5">
-        {/* Filter Tabs & Sort Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
-          {/* Segmented state filter controls */}
-          <div
-            role="tablist"
-            aria-label="Filtrar audiolivros por estado"
-            className="flex items-center gap-1 p-1 rounded-xl bg-[#1C1C1C] border border-[#2E2E2E] overflow-x-auto"
+      {/* Main Shelf Content */}
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 pt-5 sm:pt-7">
+        {/* Featured "Continue Listening" Quiet Surface (Single Elevated Focal Point) */}
+        {resumeBook && (
+          <section
+            aria-label="Continuar ouvindo"
+            className="mb-6 rounded-2xl bg-[#182028] border border-[#2A3642] p-4 sm:p-5"
           >
-            {FILTER_TABS.map((tab) => {
-              const isActive = filter === tab.value;
-              const count = counts[tab.value];
-              return (
-                <button
-                  key={tab.value}
-                  type="button"
-                  role="tab"
-                  aria-selected={isActive}
-                  onClick={() => setFilter(tab.value)}
-                  className={`min-h-[40px] px-3 rounded-lg text-xs sm:text-sm font-medium transition whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
-                    isActive
-                      ? 'bg-[#242424] text-[#F0F0F0]'
-                      : 'text-[#A0A0A0] hover:text-[#F0F0F0]'
-                  }`}
-                >
-                  <span>{tab.label}</span>
-                  <span
-                    className={`text-xs tabular-nums ${
-                      isActive ? 'text-[#B5A58A]' : 'text-[#A0A0A0]/70'
-                    }`}
-                  >
-                    {count}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+            <div className="flex items-center justify-between gap-4">
+              <button
+                type="button"
+                onClick={() => onSelectBook(resumeBook)}
+                className="flex-1 min-w-0 text-left group focus-visible:outline-[#E0A458] rounded-lg"
+              >
+                <p className="text-xs text-[#E0A458] font-medium">
+                  {isResumeBookActive && isPlaying ? 'Ouvindo agora' : 'Continuar ouvindo'}
+                </p>
+                <h2 className="mt-1 font-display text-lg sm:text-xl font-medium text-[#EDE9E0] leading-snug line-clamp-2 group-hover:text-[#E0A458] transition-colors">
+                  {resumeBook.customName}
+                </h2>
+                <div className="mt-2.5 flex items-center justify-between gap-3 text-xs text-[#96A2AE] tabular-nums">
+                  <span>{resumePercent}% concluído</span>
+                  {resumeRemaining > 0 && <span>Restam {formatDurationHuman(resumeRemaining)}</span>}
+                </div>
+                <div className="mt-2 w-full h-1 rounded-full bg-[#2A3642] overflow-hidden">
+                  <div
+                    className="h-full bg-[#E0A458] transition-all duration-300"
+                    style={{ width: `${Math.max(2, resumePercent)}%` }}
+                  />
+                </div>
+              </button>
 
-          {/* Sort selector */}
-          <div className="flex items-center justify-end sm:justify-start gap-2 shrink-0">
-            <ArrowUpDown className="w-4 h-4 text-[#A0A0A0] shrink-0" aria-hidden="true" />
-            <label htmlFor="library-sort-select" className="sr-only">
-              Ordenar audiolivros por
-            </label>
-            <select
-              id="library-sort-select"
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as SortOption)}
-              className="min-h-[44px] pl-3 pr-8 rounded-xl bg-[#1C1C1C] border border-[#2E2E2E] text-xs sm:text-sm text-[#F0F0F0] focus:border-[#B5A58A] focus:outline-none"
-            >
-              {SORT_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value} className="bg-[#1C1C1C] text-[#F0F0F0]">
-                  Ordenar: {opt.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (isResumeBookActive) {
+                    void togglePlayPause();
+                  } else {
+                    onSelectBook(resumeBook);
+                  }
+                }}
+                className="w-12 h-12 sm:w-13 sm:h-13 rounded-full bg-[#E0A458] text-[#11161C] flex items-center justify-center hover:bg-[#ECB56F] active:scale-95 transition shrink-0"
+                aria-label={
+                  isResumeBookActive && isPlaying
+                    ? `Pausar ${resumeBook.customName}`
+                    : `Continuar ${resumeBook.customName}`
+                }
+              >
+                {isResumeBookActive && isPlaying ? (
+                  <Pause className="w-5 h-5 fill-current" aria-hidden="true" />
+                ) : (
+                  <Play className="w-5 h-5 fill-current ml-0.5" aria-hidden="true" />
+                )}
+              </button>
+            </div>
+          </section>
+        )}
 
-        {/* Pending MP4 Background Optimization Banner */}
+        {/* Pending MP4 Background Optimization Notice */}
         {(unoptimizedMp4Books.length > 0 || optimizationProgress) && (
-          <div className="mb-4 rounded-2xl bg-[#1C1C1C] border border-[#2E2E2E] p-4">
+          <div className="mb-6 rounded-xl bg-[#182028] border border-[#2A3642] p-4">
             {optimizationProgress ? (
               <div className="space-y-2.5" role="status" aria-live="polite">
                 <div className="flex items-center justify-between gap-3 text-xs sm:text-sm">
-                  <span className="flex items-center gap-2 font-medium text-[#F0F0F0] min-w-0">
-                    <Loader2 className="w-4 h-4 text-[#B5A58A] animate-spin shrink-0" aria-hidden="true" />
+                  <span className="flex items-center gap-2 font-medium text-[#EDE9E0] min-w-0">
+                    <Loader2 className="w-4 h-4 text-[#E0A458] animate-spin shrink-0" aria-hidden="true" />
                     <span className="truncate">
                       Otimizando {optimizationProgress.currentIndex} de {optimizationProgress.total}:{' '}
                       {optimizationProgress.currentTitle}
                     </span>
                   </span>
-                  <span className="font-mono text-xs text-[#B5A58A] tabular-nums shrink-0">
+                  <span className="text-xs font-medium text-[#E0A458] tabular-nums shrink-0">
                     {optimizationProgress.percent}%
                   </span>
                 </div>
-                <div className="w-full h-1.5 rounded-full bg-[#2E2E2E] overflow-hidden">
+                <div className="w-full h-1 rounded-full bg-[#2A3642] overflow-hidden">
                   <div
-                    className="h-full bg-[#B5A58A] transition-all duration-150"
+                    className="h-full bg-[#E0A458] transition-all duration-150"
                     style={{ width: `${Math.max(4, optimizationProgress.percent)}%` }}
                   />
                 </div>
               </div>
             ) : (
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <p className="text-xs sm:text-sm text-[#A0A0A0] leading-relaxed">
+                <p className="text-xs sm:text-sm text-[#96A2AE] leading-relaxed">
                   {unoptimizedMp4Books.length === 1
-                    ? '1 audiolivro MP4 já importado pode ser otimizado (sem vídeo) para tocar em segundo plano sem pausar, mantendo seu progresso.'
-                    : `${unoptimizedMp4Books.length} audiolivros MP4 já importados podem ser otimizados (sem vídeo) para tocar em segundo plano sem pausar, mantendo seu progresso.`}
+                    ? '1 audiolivro MP4 pode ter o vídeo removido para tocar com a tela bloqueada, mantendo seu progresso.'
+                    : `${unoptimizedMp4Books.length} audiolivros MP4 podem ter o vídeo removido para tocar com a tela bloqueada, mantendo o progresso.`}
                 </p>
                 <button
                   type="button"
                   onClick={() => onOptimizeBooks(unoptimizedMp4Books)}
-                  className="min-h-[44px] px-4 rounded-xl bg-[#242424] border border-[#B5A58A]/40 text-xs sm:text-sm font-medium text-[#F0F0F0] hover:bg-[#2C2C2C] active:scale-[0.98] transition whitespace-nowrap shrink-0"
+                  className="min-h-[44px] px-4 rounded-xl bg-[#212B36] border border-[#E0A458]/40 text-xs sm:text-sm font-medium text-[#EDE9E0] hover:bg-[#283442] active:scale-[0.98] transition whitespace-nowrap shrink-0"
                 >
-                  Otimizar para segundo plano
+                  Otimizar agora
                 </button>
               </div>
             )}
           </div>
         )}
 
-        {/* Vertical List of Audiobooks */}
+        {/* Flush Editorial Filter Rail & Sort Row */}
+        <div className="border-b border-[#2A3642] mb-2">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div
+              role="tablist"
+              aria-label="Filtrar audiolivros por estado"
+              className="flex items-center gap-5 overflow-x-auto no-scrollbar -mb-px"
+            >
+              {FILTER_TABS.map((tab) => {
+                const isActive = filter === tab.value;
+                const count = counts[tab.value];
+                return (
+                  <button
+                    key={tab.value}
+                    type="button"
+                    role="tab"
+                    aria-selected={isActive}
+                    onClick={() => setFilter(tab.value)}
+                    className={`min-h-[44px] pb-2.5 pt-1 text-sm font-medium transition-colors whitespace-nowrap shrink-0 flex items-center gap-1.5 border-b-2 ${
+                      isActive
+                        ? 'border-[#E0A458] text-[#EDE9E0]'
+                        : 'border-transparent text-[#96A2AE] hover:text-[#EDE9E0]'
+                    }`}
+                  >
+                    <span>{tab.label}</span>
+                    <span
+                      className={`text-xs tabular-nums ${
+                        isActive ? 'text-[#E0A458]' : 'text-[#96A2AE]/70'
+                      }`}
+                    >
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex items-center justify-between sm:justify-end gap-2 pb-2 sm:pb-1.5 shrink-0">
+              <span className="text-xs text-[#96A2AE] sm:hidden tabular-nums">
+                {filteredAndSortedBooks.length}{' '}
+                {filteredAndSortedBooks.length === 1 ? 'livro' : 'livros'}
+              </span>
+              <div className="inline-flex items-center gap-1.5">
+                <ArrowUpDown className="w-3.5 h-3.5 text-[#96A2AE] shrink-0" aria-hidden="true" />
+                <label htmlFor="library-sort-select" className="sr-only">
+                  Ordenar audiolivros por
+                </label>
+                <select
+                  id="library-sort-select"
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as SortOption)}
+                  className="min-h-[36px] pl-1 pr-6 bg-transparent text-xs sm:text-sm text-[#EDE9E0] focus:outline-none cursor-pointer"
+                >
+                  {SORT_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value} className="bg-[#182028] text-[#EDE9E0]">
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Open Editorial Audiobook List (Directly on Bookcloth Canvas, Zero Card-in-Card Boxes) */}
         {filteredAndSortedBooks.length === 0 ? (
-          <div className="rounded-2xl bg-[#1C1C1C] border border-[#2E2E2E] p-8 text-center">
-            <p className="text-sm text-[#A0A0A0]">
-              Nenhum audiolivro encontrado em{' '}
-              <span className="text-[#F0F0F0] font-medium">
+          <div className="py-12 text-center">
+            <p className="text-sm text-[#96A2AE]">
+              Nenhum audiolivro em{' '}
+              <span className="text-[#EDE9E0] font-medium">
                 {FILTER_TABS.find((t) => t.value === filter)?.label.toLowerCase()}
               </span>
               .
@@ -315,14 +399,14 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
               <button
                 type="button"
                 onClick={() => setFilter('all')}
-                className="mt-4 min-h-[44px] px-4 rounded-xl bg-[#242424] border border-[#2E2E2E] text-sm font-medium text-[#F0F0F0] hover:bg-[#2C2C2C] transition"
+                className="mt-4 min-h-[44px] px-4 rounded-xl bg-[#182028] border border-[#2A3642] text-sm font-medium text-[#EDE9E0] hover:bg-[#212B36] transition-colors"
               >
-                Ver todos os audiolivros
+                Mostrar todos os audiolivros
               </button>
             )}
           </div>
         ) : (
-          <ul className="divide-y divide-[#242424] rounded-2xl bg-[#1C1C1C] border border-[#2E2E2E]">
+          <ul className="divide-y divide-[#2A3642]/70">
             {filteredAndSortedBooks.map((book) => {
               const isCurrent = activeBook?.id === book.id;
               const progressPct = calculateProgressPercent(
@@ -336,94 +420,87 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                 <li
                   key={book.id}
                   className={`relative transition-colors ${
-                    isCurrent ? 'bg-[#242424]/70' : 'hover:bg-[#242424]/40'
+                    isCurrent ? 'bg-[#182028]/60 -mx-2 px-2 rounded-xl' : ''
                   }`}
                 >
-                  <div className="flex items-center gap-3 px-4 py-3.5 sm:px-5 sm:py-4">
+                  <div className="flex items-start gap-3 py-4">
                     {/* Primary tap target to open player */}
                     <button
                       type="button"
                       onClick={() => onSelectBook(book)}
-                      className="flex-1 min-w-0 flex items-start gap-3.5 text-left rounded-lg py-0.5 focus-visible:outline-[#B5A58A]"
+                      className="flex-1 min-w-0 flex items-stretch gap-3.5 text-left rounded-lg focus-visible:outline-[#E0A458]"
                     >
+                      {/* Book-Spine Vertical Reading Ribbon */}
                       <div
-                        className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 mt-0.5 border ${
-                          isCurrent
-                            ? 'bg-[#B5A58A]/15 border-[#B5A58A]/40 text-[#B5A58A]'
-                            : 'bg-[#242424] border-[#2E2E2E] text-[#A0A0A0]'
-                        }`}
+                        className="w-[3px] self-stretch my-1 rounded-full bg-[#2A3642] overflow-hidden flex flex-col justify-end shrink-0"
+                        aria-hidden="true"
                       >
-                        {isCurrent && isPlaying ? (
-                          <Headphones className="w-5 h-5" strokeWidth={1.75} aria-hidden="true" />
-                        ) : (
-                          <BookOpen className="w-5 h-5" strokeWidth={1.75} aria-hidden="true" />
-                        )}
+                        <div
+                          className={`w-full rounded-full transition-all duration-300 ${
+                            book.status === 'completed'
+                              ? 'bg-[#E0A458]/70'
+                              : isCurrent || book.status === 'in_progress'
+                                ? 'bg-[#E0A458]'
+                                : 'bg-transparent'
+                          }`}
+                          style={{
+                            height:
+                              book.status === 'completed'
+                                ? '100%'
+                                : book.status === 'in_progress' || isCurrent
+                                  ? `${Math.max(14, progressPct)}%`
+                                  : '0%',
+                          }}
+                        />
                       </div>
 
                       <div className="min-w-0 flex-1">
-                        <h2
-                          className={`text-sm sm:text-base font-medium leading-snug line-clamp-2 ${
-                            isCurrent ? 'text-[#B5A58A]' : 'text-[#F0F0F0]'
+                        <h3
+                          className={`font-display text-[17px] sm:text-lg font-medium leading-snug line-clamp-2 ${
+                            isCurrent ? 'text-[#E0A458]' : 'text-[#EDE9E0]'
                           }`}
                         >
                           {book.customName}
-                        </h2>
+                        </h3>
 
-                        {/* Clean unboxed metadata row (zero pills) */}
-                        <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[#A0A0A0]">
+                        {/* Clean two-slot metadata row (Zero middle dots) */}
+                        <div className="mt-1.5 flex items-baseline justify-between gap-3 text-xs text-[#96A2AE]">
                           <span
                             className={
-                              book.status === 'in_progress'
-                                ? 'text-[#B5A58A]'
-                                : book.status === 'completed'
-                                  ? 'text-[#F0F0F0]/80'
-                                  : 'text-[#A0A0A0]'
+                              isCurrent && isPlaying
+                                ? 'text-[#E0A458] font-medium'
+                                : book.status === 'in_progress'
+                                  ? 'text-[#EDE9E0]/85'
+                                  : 'text-[#96A2AE]'
                             }
                           >
-                            {isCurrent && isPlaying ? 'Reproduzindo' : getStatusLabel(book.status)}
+                            {isCurrent && isPlaying
+                              ? 'Ouvindo agora'
+                              : book.status === 'in_progress' && book.duration > 0
+                                ? `${progressPct}% ouvido`
+                                : getStatusLabel(book.status)}
                           </span>
 
-                          {book.duration > 0 && (
-                            <>
-                              <span aria-hidden="true">·</span>
-                              <span className="tabular-nums">
-                                {formatDurationHuman(book.duration)}
-                              </span>
-                            </>
-                          )}
-
-                          {book.status === 'in_progress' && book.currentTime > 0 && (
-                            <>
-                              <span aria-hidden="true">·</span>
-                              <span className="font-mono tabular-nums">
-                                {formatTime(book.currentTime)}
-                                {book.duration > 0 ? ` (${progressPct}%)` : ''}
-                              </span>
-                            </>
-                          )}
+                          <span className="tabular-nums shrink-0 text-right">
+                            {book.status === 'in_progress' && book.currentTime > 0
+                              ? formatTime(book.currentTime)
+                              : book.duration > 0
+                                ? formatDurationHuman(book.duration)
+                                : ''}
+                          </span>
                         </div>
-
-                        {/* Minimal inline progress line for in-progress books */}
-                        {book.status === 'in_progress' && book.duration > 0 && (
-                          <div className="mt-2.5 w-full max-w-xs h-1 rounded-full bg-[#2E2E2E] overflow-hidden">
-                            <div
-                              className="h-full bg-[#B5A58A]"
-                              style={{ width: `${Math.max(2, progressPct)}%` }}
-                            />
-                          </div>
-                        )}
                       </div>
                     </button>
 
                     {/* Item action menu button */}
-                    <div className="relative shrink-0">
+                    <div className="relative shrink-0 -mt-1">
                       <button
                         type="button"
                         onClick={() => {
                           setHeaderMenuOpen(false);
                           setOpenMenuBookId(isMenuOpen ? null : book.id);
                         }}
-                        className="min-h-[44px] min-w-[44px] -mr-2 flex items-center justify-center rounded-xl text-[#A0A0A0] hover:text-[#F0F0F0] hover:bg-[#242424] transition"
+                        className="min-h-[44px] min-w-[44px] -mr-2 flex items-center justify-center rounded-xl text-[#96A2AE] hover:text-[#EDE9E0] hover:bg-[#182028] transition-colors"
                         aria-label={`Opções para ${book.customName}`}
                         aria-expanded={isMenuOpen}
                         aria-haspopup="menu"
@@ -434,7 +511,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                       {isMenuOpen && (
                         <div
                           role="menu"
-                          className="absolute right-0 mt-1 w-56 rounded-xl bg-[#242424] border border-[#2E2E2E] py-1.5 shadow-lg z-40"
+                          className="absolute right-0 mt-1 w-60 rounded-xl bg-[#212B36] border border-[#2A3642] py-1.5 shadow-xl z-40"
                         >
                           <button
                             type="button"
@@ -443,9 +520,9 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                               setOpenMenuBookId(null);
                               onRequestRename(book);
                             }}
-                            className="w-full min-h-[44px] px-4 flex items-center gap-3 text-left text-sm text-[#F0F0F0] hover:bg-[#2C2C2C] transition"
+                            className="w-full min-h-[44px] px-4 flex items-center gap-3 text-left text-sm text-[#EDE9E0] hover:bg-[#283442] transition-colors"
                           >
-                            <Pencil className="w-4 h-4 text-[#A0A0A0] shrink-0" aria-hidden="true" />
+                            <Pencil className="w-4 h-4 text-[#96A2AE] shrink-0" aria-hidden="true" />
                             <span>Renomear</span>
                           </button>
 
@@ -457,9 +534,9 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                                 setOpenMenuBookId(null);
                                 onMarkCompleted(book);
                               }}
-                              className="w-full min-h-[44px] px-4 flex items-center gap-3 text-left text-sm text-[#F0F0F0] hover:bg-[#2C2C2C] transition"
+                              className="w-full min-h-[44px] px-4 flex items-center gap-3 text-left text-sm text-[#EDE9E0] hover:bg-[#283442] transition-colors"
                             >
-                              <Check className="w-4 h-4 text-[#A0A0A0] shrink-0" aria-hidden="true" />
+                              <Check className="w-4 h-4 text-[#96A2AE] shrink-0" aria-hidden="true" />
                               <span>Marcar como concluído</span>
                             </button>
                           ) : (
@@ -470,10 +547,10 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                                 setOpenMenuBookId(null);
                                 onRestartBook(book);
                               }}
-                              className="w-full min-h-[44px] px-4 flex items-center gap-3 text-left text-sm text-[#F0F0F0] hover:bg-[#2C2C2C] transition"
+                              className="w-full min-h-[44px] px-4 flex items-center gap-3 text-left text-sm text-[#EDE9E0] hover:bg-[#283442] transition-colors"
                             >
                               <RotateCcw
-                                className="w-4 h-4 text-[#A0A0A0] shrink-0"
+                                className="w-4 h-4 text-[#96A2AE] shrink-0"
                                 aria-hidden="true"
                               />
                               <span>Ouvir do início</span>
@@ -488,10 +565,10 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                                 setOpenMenuBookId(null);
                                 onRestartBook(book);
                               }}
-                              className="w-full min-h-[44px] px-4 flex items-center gap-3 text-left text-sm text-[#F0F0F0] hover:bg-[#2C2C2C] transition"
+                              className="w-full min-h-[44px] px-4 flex items-center gap-3 text-left text-sm text-[#EDE9E0] hover:bg-[#283442] transition-colors"
                             >
                               <RotateCcw
-                                className="w-4 h-4 text-[#A0A0A0] shrink-0"
+                                className="w-4 h-4 text-[#96A2AE] shrink-0"
                                 aria-hidden="true"
                               />
                               <span>Reiniciar do início</span>
@@ -507,14 +584,14 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                                 setOpenMenuBookId(null);
                                 onOptimizeBooks([book]);
                               }}
-                              className="w-full min-h-[44px] px-4 flex items-center gap-3 text-left text-sm text-[#B5A58A] hover:bg-[#2C2C2C] disabled:opacity-50 transition"
+                              className="w-full min-h-[44px] px-4 flex items-center gap-3 text-left text-sm text-[#E0A458] hover:bg-[#283442] disabled:opacity-50 transition-colors"
                             >
                               <AudioLines className="w-4 h-4 shrink-0" aria-hidden="true" />
                               <span>Otimizar para segundo plano</span>
                             </button>
                           )}
 
-                          <div className="my-1 border-t border-[#2E2E2E]" />
+                          <div className="my-1 border-t border-[#2A3642]" />
 
                           <button
                             type="button"
@@ -524,7 +601,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                               setOpenMenuBookId(null);
                               onRequestDeleteBook(book);
                             }}
-                            className="w-full min-h-[44px] px-4 flex items-center gap-3 text-left text-sm text-[#CF6679] hover:bg-[#2C2C2C] disabled:opacity-50 transition"
+                            className="w-full min-h-[44px] px-4 flex items-center gap-3 text-left text-sm text-[#E06C75] hover:bg-[#283442] disabled:opacity-50 transition-colors"
                           >
                             <Trash2 className="w-4 h-4 shrink-0" aria-hidden="true" />
                             <span>Remover</span>
